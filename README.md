@@ -1,6 +1,6 @@
 
-Dirty Unicorns 12.1 for Osprey
-==============================
+Dirty Unicorns Oreo (12.X) for Osprey
+=====================================
 
 Current Status
 --------------
