@@ -46,6 +46,9 @@ OR, for those with limited bandwidth/storage:
 
     repo sync -c -f --no-clone-bundle --no-tags --force-sync --optimized-fetch --prune
 
+Apply Patches
+
+    Place patch.sh and all *.patch files in your build directory. Run the patch.sh script to apply the patches.
 
 Now start the build...
 
