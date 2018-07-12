@@ -30,9 +30,6 @@
 	<remove-project path="vendor/du" name="android_vendor_du"/>
 	<project name="chil360/android_vendor_du" path="vendor/du" remote="github" revision="o8x" />
 
-      	<remove-project path="frameworks/av" name="android_frameworks_av"/>
-	<project name="chil360/android_frameworks_av" path="frameworks/av" remote="github" revision="o8x-caf" />
-
 	<!-- Add Snap -->
 	<project path="packages/apps/Snap" name="PixelExperience/packages_apps_Snap" remote="github" revision="oreo-mr1" />
 
