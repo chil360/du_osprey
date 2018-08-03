@@ -33,7 +33,7 @@
 	<!-- Add Snap -->
 	<project path="packages/apps/Snap" name="PixelExperience/packages_apps_Snap" remote="github" revision="oreo-mr1" />
 
-	<!-- Linaro 7.2 kernel toolchain -->
-	<project name="Subinsmani/prebuilts_gcc_linux-x86_arm_arm-eabi-7.2" path="prebuilts/gcc/linux-x86/arm/arm-eabi-7.2" remote="github" revision="master" />
+	<!-- Linaro 7.3 kernel toolchain -->
+	<project name="dev-harsh1998/GCC_BUILDS" path="prebuilts/gcc/linux-x86/arm/arm-eabi-7.3" remote="github" revision="master" />
 
 </manifest>
