@@ -2,36 +2,25 @@
 <manifest>
 
 	<!-- Device -->
-	<project name="chil360/android_device_motorola_osprey" path="device/motorola/osprey" remote="github" revision="du-o8x" />
-	<project name="chil360/android_device_motorola_msm8916-common" path="device/motorola/msm8916-common" remote="github" revision="du-o8x" />
-	<project name="chil360/android_kernel_motorola_msm8916.git" path="kernel/motorola/msm8916" remote="github" revision="8.1.x" />
-	<project name="chil360/proprietary_vendor_motorola" path="vendor/motorola" remote="github" revision="lineage-15.1" />
+	<project name="chil360/android_device_motorola_osprey" path="device/motorola/osprey" remote="github" revision="du-p9x" />
+	<project name="chil360/android_device_motorola_msm8916-common" path="device/motorola/msm8916-common" remote="github" revision="du-p9x" />
+	<project name="chil360/android_kernel_motorola_msm8916" path="kernel/motorola/msm8916" remote="github" revision="9.0" />
+	<project name="chil360/proprietary_vendor_motorola" path="vendor/motorola" remote="github" revision="lineage-16.0" />
 
 	<!-- Device dependencies -->
-	<project name="chil360/android_device_qcom_common" path="device/qcom/common" remote="github" revision="o8x-caf" />
-	<project name="LineageOS/android_packages_resources_devicesettings" path="packages/resources/devicesettings" remote="github" revision="lineage-15.1" />
-	<project name="LineageOS/android_external_sony_boringssl-compat" path="external/sony/boringssl-compat" remote="github" revision="lineage-15.1" />
-	<project name="LineageOS/android_system_qcom" path="system/qcom" remote="github" revision="lineage-15.1" />
+	<project name="LineageOS/android_system_tools_dtbtool" path="system/tools/dtbtool" remote="github" revision="lineage-16.0" />
+	<project name="LineageOS/android_packages_resources_devicesettings" path="packages/resources/devicesettings" remote="github" revision="lineage-16.0" />
+	<project name="LineageOS/android_external_sony_boringssl-compat" path="external/sony/boringssl-compat" remote="github" revision="lineage-16.0" />
+	<project path="system/qcom" name="DirtyUnicorns/android_system_qcom" remote="github" revision="p9x-caf" />
 
-	<!-- Lineage MSM8916 -->
-	<project path="hardware/qcom/audio-caf/msm8916" name="LineageOS/android_hardware_qcom_audio" groups="qcom,qcom_audio,pdk" remote="github" revision="lineage-15.1-caf-8916" />
-	<project path="hardware/qcom/display-caf/msm8916" name="LineageOS/android_hardware_qcom_display" groups="pdk,qcom,qcom_display" remote="github" revision="lineage-15.1-caf-8916" />
-	<project path="hardware/qcom/media-caf/msm8916" name="LineageOS/android_hardware_qcom_media" groups="qcom,pdk" remote="github" revision="lineage-15.1-caf-8916" />
+	<!-- MSM8916 HALS -->
+	<project path="hardware/qcom/audio-caf/msm8916" name="chil360/android_hardware_qcom_audio" groups="qcom,qcom_audio,pdk" remote="github" revision="du-p9x-caf-8916" />
+	<project path="hardware/qcom/display-caf/msm8916" name="LineageOS/android_hardware_qcom_display" groups="pdk,qcom,qcom_display" remote="github" revision="lineage-16.0-caf-8916" />
+	<project path="hardware/qcom/media-caf/msm8916" name="LineageOS/android_hardware_qcom_media" groups="qcom,pdk" remote="github" revision="lineage-16.0-caf-8916" />
 
 	<!-- FM Radio -->
-	<project name="DirtyUnicorns/android_hardware_qcom_fm" path="hardware/qcom/fm" remote="github" revision="o8x-caf" />
-	<project name="DirtyUnicorns/android_packages_apps_FMRadio" path="packages/apps/FMRadio" remote="github" revision="o8x-caf" />
-
-	<!-- RIL -->
-	<remove-project path="hardware/ril" name="android_hardware_ril"/>
-	<project name="LineageOS/android_hardware_ril" path="hardware/ril" remote="github" revision="lineage-15.1-caf" />
-
-        <!-- DU -->
-	<remove-project path="vendor/du" name="android_vendor_du"/>
-	<project name="chil360/android_vendor_du" path="vendor/du" remote="github" revision="o8x" />
-
-	<!-- Add Snap -->
-	<project path="packages/apps/Snap" name="PixelExperience/packages_apps_Snap" remote="github" revision="oreo-mr1" />
+	<project path="hardware/qcom/fm" name="DirtyUnicorns/android_hardware_qcom_fm" remote="github" revision="p9x-caf" />
+	<project path="packages/apps/FMRadio" name="DirtyUnicorns/android_packages_apps_FMRadio" remote="github" revision="p9x-caf" />
 
 	<!-- Linaro 7.3 kernel toolchain -->
 	<project name="dev-harsh1998/GCC_BUILDS" path="prebuilts/gcc/linux-x86/arm/arm-eabi-7.3" remote="github" revision="master" />

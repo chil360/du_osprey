@@ -1,0 +1,26 @@
+From 08da0fee290d84a9fe27ebc48cb5203af8645987 Mon Sep 17 00:00:00 2001
+From: Kyle Harrison <khwebmail@gmail.com>
+Date: Tue, 23 Oct 2018 19:19:12 +0100
+Subject: [PATCH] soong_config: Add legacy HAL1 camera
+
+Change-Id: I3b7362b1613296bb7f6f740793362a6611a83dc9
+---
+ core/soong_config.mk | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/core/soong_config.mk b/core/soong_config.mk
+index a0173e124..f611ada4f 100644
+--- a/core/soong_config.mk
++++ b/core/soong_config.mk
+@@ -115,6 +115,8 @@ else
+   $(call add_json_str, Additional_gralloc_10_usage_bits, $(TARGET_ADDITIONAL_GRALLOC_10_USAGE_BITS))
+ endif
+ 
++$(call add_json_bool, Has_legacy_camera_hal1, $(filter true,$(TARGET_HAS_LEGACY_CAMERA_HAL1)))
++
+ $(call add_json_bool, ArtUseReadBarrier,                 $(call invert_bool,$(filter false,$(PRODUCT_ART_USE_READ_BARRIER))))
+ $(call add_json_bool, Binder32bit,                       $(BINDER32BIT))
+ $(call add_json_bool, Brillo,                            $(BRILLO))
+-- 
+2.19.1
+

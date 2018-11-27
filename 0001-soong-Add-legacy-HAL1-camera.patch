@@ -1,0 +1,36 @@
+From edfee699660a59e23c93ae2dbdc037a911ca1bf7 Mon Sep 17 00:00:00 2001
+From: Kyle Harrison <khwebmail@gmail.com>
+Date: Tue, 23 Oct 2018 19:20:40 +0100
+Subject: [PATCH] soong: Add legacy HAL1 camera
+
+Change-Id: I89193b20fb16198144113f05d648d988d480b93f
+---
+ android/variable.go | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/android/variable.go b/android/variable.go
+index 3d635e97..cdd72bd3 100644
+--- a/android/variable.go
++++ b/android/variable.go
+@@ -119,6 +119,10 @@ type variableProperties struct {
+ 			Cppflags []string
+ 		}
+ 
++		Has_legacy_camera_hal1 struct {
++			Cflags []string
++		}
++
+ 		Needs_text_relocations struct {
+ 			Cppflags []string
+ 		}
+@@ -257,6 +261,7 @@ type productVariables struct {
+ 	VendorVars map[string]map[string]string `json:",omitempty"`
+ 
+ 	Additional_gralloc_10_usage_bits  *string `json:",omitempty"`
++	Has_legacy_camera_hal1  *bool `json:",omitempty"`
+ 
+ 	Needs_text_relocations     *bool `json:",omitempty"`
+ 	Has_legacy_mmap            *bool `json:",omitempty"`
+-- 
+2.19.1
+

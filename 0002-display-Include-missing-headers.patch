@@ -1,0 +1,51 @@
+From 9e9be648249698d894d40de4fc40203a996963ba Mon Sep 17 00:00:00 2001
+From: Nicholas Lim <nicknitewolf@lineageos.org>
+Date: Thu, 9 Aug 2018 13:45:09 +0800
+Subject: [PATCH 2/4] display: Include missing headers
+
+Change-Id: I6f2768543e801888d2dc80100dbae9bf75c36ada
+---
+ libgralloc/alloc_controller.cpp | 1 +
+ libgralloc/ionalloc.cpp         | 1 +
+ libqdutils/comptype.h           | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/libgralloc/alloc_controller.cpp b/libgralloc/alloc_controller.cpp
+index ac7dd92c0..d2367da45 100644
+--- a/libgralloc/alloc_controller.cpp
++++ b/libgralloc/alloc_controller.cpp
+@@ -41,6 +41,7 @@
+ #include "comptype.h"
+ #include "mdp_version.h"
+ #include <qdMetaData.h>
++#include <string.h>
+ 
+ #ifdef VENUS_COLOR_FORMAT
+ #include <media/msm_media_info.h>
+diff --git a/libgralloc/ionalloc.cpp b/libgralloc/ionalloc.cpp
+index ace1c749e..23f71fa1c 100644
+--- a/libgralloc/ionalloc.cpp
++++ b/libgralloc/ionalloc.cpp
+@@ -31,6 +31,7 @@
+ #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
++#include <string.h>
+ #include <stdlib.h>
+ #include <fcntl.h>
+ 
+diff --git a/libqdutils/comptype.h b/libqdutils/comptype.h
+index 71f487161..bbadaae30 100644
+--- a/libqdutils/comptype.h
++++ b/libqdutils/comptype.h
+@@ -31,6 +31,7 @@
+ #define INCLUDE_LIBQCOM_COMPTYPES
+ 
+ #include <stdint.h>
++#include <string.h>
+ #include <utils/Singleton.h>
+ #include <cutils/properties.h>
+ 
+-- 
+2.19.0
+

@@ -1,5 +1,5 @@
 
-Dirty Unicorns Oreo (12.X) for Osprey
+Dirty Unicorns Oreo (13.X) for Osprey
 =====================================
 
 Current Status
@@ -7,19 +7,23 @@ Current Status
 
 What's working?
  - Bluetooth
- - Camera
+ - Camera (except HDR)
  - Camcorder
  - RIL
  - WiFi
  - Storage
  - 4G
+
+Not working?
+ - Camera HDR
  - VoLTE
- - Selinux Enforcing
+ - Selinux is still Permissive
 
 Download
 --------
 
-My current builds are available [here](https://mega.nz/#F!3F9CTSrQ!ZBLcFw1Mh_47FdxiZ2LYyg!WNFCDQ4L).
+By request from DU devs, unofficial builds are not allowed to be published until after the first offical release of Dirty Unicorns 13.0.
+My builds for Osprey should be available shortly after official DU 13.0 is released. 
 
 Build Instructions
 ------------------
@@ -30,7 +34,7 @@ Create a build directory
 
 Initialize your local repository using the LineageOS trees, use a command like this:
 
-    repo init -u git://github.com/DirtyUnicorns/android_manifest.git -b o8x-caf
+    repo init -u git://github.com/DirtyUnicorns/android_manifest.git -b p9x-caf
 
 Now create a local_manifests directory
 
