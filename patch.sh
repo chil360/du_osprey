@@ -34,9 +34,16 @@ cd device/motorola/msm8916-common
 git am -3 $TOP/0001-DO-NOT-MERGE-msm8916-common-Force-battery-led-off.patch
 cd $TOP
 
+cd system/sepolicy
+git am -3 $TOP/0001-Add-rules-required-for-TARGET_HAS_LEGACY_CAMERA_HAL1.patch
+cd $TOP
+
 #############################################################
 # CHERRYPICKS                                               #
 #############################################################
 
 # Example: repopick [CHANGE_NUMBER]
+
+# system/sepolicy
+repopick 5683-5686
 

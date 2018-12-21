@@ -7,6 +7,9 @@
 	<project name="chil360/android_kernel_motorola_msm8916" path="kernel/motorola/msm8916" remote="github" revision="9.0" />
 	<project name="chil360/proprietary_vendor_motorola" path="vendor/motorola" remote="github" revision="lineage-16.0" />
 
+	<!-- Sepolicy -->
+	<project name="GZOSP-Devices/device_qcom_sepolicy-legacy" path="device/qcom/sepolicy-legacy" remote="github" revision="9.0" />
+
 	<!-- Device dependencies -->
 	<project name="LineageOS/android_system_tools_dtbtool" path="system/tools/dtbtool" remote="github" revision="lineage-16.0" />
 	<project name="LineageOS/android_packages_resources_devicesettings" path="packages/resources/devicesettings" remote="github" revision="lineage-16.0" />

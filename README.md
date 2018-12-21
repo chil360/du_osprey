@@ -13,17 +13,16 @@ What's working?
  - WiFi
  - Storage
  - 4G
+ - Camera HDR - Use provided OpenCamera
+ - Selinux Enforcing
 
 Not working?
- - Camera HDR
  - VoLTE
- - Selinux is still Permissive
 
 Download
 --------
 
-By request from DU devs, unofficial builds are not allowed to be published until after the first offical release of Dirty Unicorns 13.0.
-My builds for Osprey should be available shortly after official DU 13.0 is released. 
+Downloads for DU 13.x are available here at [AndroidFileHost](https://androidfilehost.com/?w=files&flid=272894).
 
 Build Instructions
 ------------------
