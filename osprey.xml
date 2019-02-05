@@ -8,7 +8,7 @@
 	<project name="chil360/proprietary_vendor_motorola" path="vendor/motorola" remote="github" revision="lineage-16.0" />
 
 	<!-- Sepolicy -->
-	<project name="GZOSP-Devices/device_qcom_sepolicy-legacy" path="device/qcom/sepolicy-legacy" remote="github" revision="9.0" />
+	<project name="chil360/device_qcom_sepolicy-legacy" path="device/qcom/sepolicy-legacy" remote="github" revision="du-p9x" />
 
 	<!-- Device dependencies -->
 	<project name="LineageOS/android_system_tools_dtbtool" path="system/tools/dtbtool" remote="github" revision="lineage-16.0" />
@@ -25,7 +25,11 @@
 	<project path="hardware/qcom/fm" name="DirtyUnicorns/android_hardware_qcom_fm" remote="github" revision="p9x-caf" />
 	<project path="packages/apps/FMRadio" name="DirtyUnicorns/android_packages_apps_FMRadio" remote="github" revision="p9x-caf" />
 
-	<!-- Linaro 7.3 kernel toolchain -->
-	<project name="dev-harsh1998/GCC_BUILDS" path="prebuilts/gcc/linux-x86/arm/arm-eabi-7.3" remote="github" revision="master" />
+	<!-- Power HAL -->
+        <remove-project path="hardware/qcom/power" name="android_hardware_qcom_power" remote="du" revision="p9x-caf" />
+        <project path="hardware/qcom/power" name="GZOSP/hardware_qcom_power" remote="github" revision="9.0" />
+
+	<!-- ARM Developer GCC 8.2 kernel toolchain -->
+	<project name="chil360/prebuilts_gcc_linux-x86_arm_arm-eabi-8.2" path="prebuilts/gcc/linux-x86/arm/arm-eabi-8.2" remote="local" revision="master" />
 
 </manifest>

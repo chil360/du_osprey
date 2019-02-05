@@ -1,0 +1,594 @@
+From 3dfa527587de068bf1af234ba6186d729c08850a Mon Sep 17 00:00:00 2001
+From: Kyle Harrison <khwebmail@gmail.com>
+Date: Sat, 2 Feb 2019 20:57:40 +0000
+Subject: [PATCH] DU Custom Fonts [2/4]
+
+Change-Id: I61953f4ca8b9d23bbf5cf1761eb52b930f1a8bf2
+---
+ AndroidManifest.xml                           |   1 +
+ res/drawable/font_dialog_icon.xml             |   8 +
+ res/drawable/ic_font_picker.xml               |   7 +
+ res/layout/font_item.xml                      |  60 ++++++++
+ res/values/du_strings.xml                     |   4 +
+ res/xml/display_settings.xml                  |   6 +
+ src/com/android/settings/DisplaySettings.java |  40 +++++
+ .../display/FontDialogPreference.java         |  97 ++++++++++++
+ .../settings/display/FontListAdapter.java     | 142 ++++++++++++++++++
+ .../FontPickerPreferenceController.java       |  99 ++++++++++++
+ 10 files changed, 464 insertions(+)
+ create mode 100644 res/drawable/font_dialog_icon.xml
+ create mode 100644 res/drawable/ic_font_picker.xml
+ create mode 100644 res/layout/font_item.xml
+ create mode 100644 src/com/android/settings/display/FontDialogPreference.java
+ create mode 100644 src/com/android/settings/display/FontListAdapter.java
+ create mode 100644 src/com/android/settings/display/FontPickerPreferenceController.java
+
+diff --git a/AndroidManifest.xml b/AndroidManifest.xml
+index 36f9d4bc40..7e68eb9d14 100644
+--- a/AndroidManifest.xml
++++ b/AndroidManifest.xml
+@@ -23,6 +23,7 @@
+     <uses-permission android:name="android.permission.HARDWARE_TEST" />
+     <uses-permission android:name="android.permission.CALL_PHONE" />
+     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
++    <uses-permission android:name="android.permission.ACCESS_FONT_MANAGER" />
+     <uses-permission android:name="android.permission.MASTER_CLEAR" />
+     <uses-permission android:name="com.google.android.googleapps.permission.GOOGLE_AUTH" />
+     <uses-permission android:name="android.permission.ACCESS_DOWNLOAD_MANAGER" />
+diff --git a/res/drawable/font_dialog_icon.xml b/res/drawable/font_dialog_icon.xml
+new file mode 100644
+index 0000000000..fb1f234f47
+--- /dev/null
++++ b/res/drawable/font_dialog_icon.xml
+@@ -0,0 +1,8 @@
++<!-- drawable/format_font.xml -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:height="24dp"
++    android:width="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path android:fillColor="@*android:color/accent_device_default_light" android:pathData="M17,8H20V20H21V21H17V20H18V17H14L12.5,20H14V21H10V20H11L17,8M18,9L14.5,16H18V9M5,3H10C11.11,3 12,3.89 12,5V16H9V11H6V16H3V5C3,3.89 3.89,3 5,3M6,5V9H9V5H6Z" />
++</vector>
+diff --git a/res/drawable/ic_font_picker.xml b/res/drawable/ic_font_picker.xml
+new file mode 100644
+index 0000000000..75a3a49caa
+--- /dev/null
++++ b/res/drawable/ic_font_picker.xml
+@@ -0,0 +1,7 @@
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:height="24dp"
++    android:width="24dp"
++    android:viewportWidth="24"
++    android:viewportHeight="24">
++    <path android:fillColor="?android:attr/colorControlNormal" android:pathData="M9.62,12L12,5.67L14.37,12M11,3L5.5,17H7.75L8.87,14H15.12L16.25,17H18.5L13,3H11Z" />
++</vector>
+diff --git a/res/layout/font_item.xml b/res/layout/font_item.xml
+new file mode 100644
+index 0000000000..d117753d21
+--- /dev/null
++++ b/res/layout/font_item.xml
+@@ -0,0 +1,60 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2006 The Android Open Source Project
++      Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++           http://www.apache.org/licenses/LICENSE-2.0
++      Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++ <!-- Layout for a Preference in a PreferenceActivity. The
++     Preference is able to place a specific widget for its particular
++     type in the "widget_frame" layout. -->
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@android:id/widget_frame"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:minHeight="?android:attr/listPreferredItemHeightSmall"
++    android:gravity="center_vertical"
++    android:paddingStart="?android:attr/listPreferredItemPaddingStart"
++    android:paddingEnd="?android:attr/listPreferredItemPaddingEnd"
++    android:background="?android:attr/selectableItemBackground">
++     <ImageView
++        android:id="@+id/icon"
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginEnd="12dip"
++        android:padding="2dp"
++        android:maxWidth="36dip"
++        android:maxHeight="36dip"
++        android:adjustViewBounds="true"
++        android:layout_gravity="center" />
++     <RelativeLayout
++        android:layout_width="wrap_content"
++        android:layout_height="wrap_content"
++        android:layout_marginStart="2dip"
++        android:layout_marginEnd="6dip"
++        android:layout_marginTop="6dip"
++        android:layout_marginBottom="6dip"
++        android:layout_weight="1">
++         <TextView android:id="@android:id/title"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:singleLine="true"
++            android:textAppearance="@android:style/TextAppearance.Material.Subhead"
++            android:textColor="?android:attr/textColorPrimary"
++            android:ellipsize="marquee"
++            android:fadingEdge="horizontal" />
++         <TextView android:id="@android:id/summary"
++            android:layout_width="wrap_content"
++            android:layout_height="wrap_content"
++            android:layout_below="@android:id/title"
++            android:layout_alignStart="@android:id/title"
++            android:textAppearance="@android:style/TextAppearance.Material.Body1"
++            android:textColor="?android:attr/textColorSecondary"
++            android:maxLines="2" />
++     </RelativeLayout>
++ </LinearLayout>
+diff --git a/res/values/du_strings.xml b/res/values/du_strings.xml
+index 360b9cd5e1..1a7b1ca0d8 100644
+--- a/res/values/du_strings.xml
++++ b/res/values/du_strings.xml
+@@ -138,4 +138,8 @@
+     <string name="keyguard_multiuser_switch_title">Multiuser switch</string>
+     <string name="keyguard_multiuser_switch_summary">Show multiuser switch on the statusbar</string>
+ 
++    <!-- Font picker -->
++    <string name="font_picker_title">Font</string>
++    <string name="font_picker_progress">Applying new font\u2026</string>
++
+ </resources>
+diff --git a/res/xml/display_settings.xml b/res/xml/display_settings.xml
+index 180114ac59..ac9815aecf 100644
+--- a/res/xml/display_settings.xml
++++ b/res/xml/display_settings.xml
+@@ -164,6 +164,12 @@
+             android:key="accent_picker"
+             android:title="@string/theme_accent_picker_title" />
+ 
++        <com.android.settings.display.FontDialogPreference
++            android:key="custom_font"
++            android:icon="@drawable/ic_font_picker"
++            android:title="@string/font_picker_title"
++            android:persistent="false" />
++
+         <Preference
+             android:key="qs_tile_style"
+             android:title="@string/qs_tile_style_title" />
+diff --git a/src/com/android/settings/DisplaySettings.java b/src/com/android/settings/DisplaySettings.java
+index 64d6977643..ab6d88ef71 100644
+--- a/src/com/android/settings/DisplaySettings.java
++++ b/src/com/android/settings/DisplaySettings.java
+@@ -17,7 +17,11 @@
+ package com.android.settings;
+ 
+ import android.app.Fragment;
++import android.content.BroadcastReceiver;
+ import android.content.Context;
++import android.content.Intent;
++import android.content.IntentFilter;
++import android.os.Bundle;
+ import android.provider.SearchIndexableResource;
+ 
+ import com.android.internal.hardware.AmbientDisplayConfiguration;
+@@ -42,6 +46,7 @@ import com.android.settings.display.ThemePreferenceController;
+ import com.android.settings.display.TimeoutPreferenceController;
+ import com.android.settings.display.VrDisplayPreferenceController;
+ import com.android.settings.display.WallpaperPreferenceController;
++import com.android.settings.display.FontPickerPreferenceController;
+ import com.android.settings.search.BaseSearchIndexProvider;
+ import com.android.settings.search.Indexable;
+ import com.android.settingslib.core.AbstractPreferenceController;
+@@ -59,6 +64,40 @@ public class DisplaySettings extends DashboardFragment {
+     private static final String KEY_AMBIENT_DISPLAY = "ambient_display";
+     private static final String KEY_AUTO_BRIGHTNESS = "auto_brightness_entry";
+     private static final String KEY_NIGHT_DISPLAY = "night_display";
++    private IntentFilter mIntentFilter;
++    private static FontPickerPreferenceController mFontPickerPreference;
++
++    private BroadcastReceiver mIntentReceiver = new BroadcastReceiver() {
++        @Override
++        public void onReceive(Context context, Intent intent) {
++            String action = intent.getAction();
++            if (action.equals("com.android.server.ACTION_FONT_CHANGED")) {
++                mFontPickerPreference.stopProgress();
++            }
++        }
++    };
++
++    @Override
++    public void onCreate(Bundle savedInstanceState) {
++        super.onCreate(savedInstanceState);
++        mIntentFilter = new IntentFilter();
++        mIntentFilter.addAction("com.android.server.ACTION_FONT_CHANGED");
++    }
++
++    @Override
++    public void onResume() {
++        super.onResume();
++        final Context context = getActivity();
++        context.registerReceiver(mIntentReceiver, mIntentFilter);
++    }
++
++    @Override
++    public void onPause() {
++        super.onPause();
++        final Context context = getActivity();
++        context.unregisterReceiver(mIntentReceiver);
++        mFontPickerPreference.stopProgress();
++    }
+ 
+     @Override
+     public int getMetricsCategory() {
+@@ -88,6 +127,7 @@ public class DisplaySettings extends DashboardFragment {
+     private static List<AbstractPreferenceController> buildPreferenceControllers(
+             Context context, Lifecycle lifecycle, Fragment fragment) {
+         final List<AbstractPreferenceController> controllers = new ArrayList<>();
++        controllers.add(mFontPickerPreference = new FontPickerPreferenceController(context, lifecycle));
+         controllers.add(new CameraGesturePreferenceController(context));
+         controllers.add(new LiftToWakePreferenceController(context));
+         controllers.add(new NightDisplayPreferenceController(context));
+diff --git a/src/com/android/settings/display/FontDialogPreference.java b/src/com/android/settings/display/FontDialogPreference.java
+new file mode 100644
+index 0000000000..b7bbc1efd9
+--- /dev/null
++++ b/src/com/android/settings/display/FontDialogPreference.java
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (C) 2018 The Dirty Unicorns Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ * preference for managing custom fonts
++ */
++
++package com.android.settings.display;
++
++import android.app.AlertDialog.Builder;
++import android.app.ProgressDialog;
++import android.content.Context;
++import android.content.DialogInterface;
++import android.content.FontInfo;
++import android.content.IFontService;
++import android.os.RemoteException;
++import android.os.ServiceManager;
++import android.util.AttributeSet;
++
++import com.android.settings.R;
++import com.android.settingslib.CustomDialogPreference;
++
++public class FontDialogPreference extends CustomDialogPreference {
++    private static final String TAG = "FontDialogPreference";
++    private Context mContext;
++    private IFontService mFontService;
++    private ProgressDialog mProgressDialog;
++
++    public FontDialogPreference(Context context, AttributeSet attrs) {
++        super(context, attrs);
++        mContext = context;
++        mFontService = IFontService.Stub.asInterface(
++                ServiceManager.getService("dufont"));
++    }
++
++    @Override
++    protected void onPrepareDialogBuilder(Builder builder,
++                                          DialogInterface.OnClickListener listener) {
++        super.onPrepareDialogBuilder(builder, listener);
++        FontListAdapter adapter = new FontListAdapter(mContext);
++        DialogInterface.OnClickListener l = new DialogInterface.OnClickListener() {
++            @Override
++            public void onClick(DialogInterface dialog, int which) {
++                FontInfo info = adapter.getItem(which);
++                try {
++                    startProgress();
++                    mFontService.applyFont(info);
++                } catch (RemoteException e) {
++                    stopProgress();
++                }
++            }
++        };
++        builder.setIcon(R.drawable.font_dialog_icon);
++        builder.setAdapter(adapter, l);
++        builder.setCancelable(false);
++        builder.setNegativeButton(mContext.getString(com.android.internal.R.string.cancel),
++                listener);
++    }
++
++    @Override
++    protected void onClick(DialogInterface dialog, int which) {
++        if (which == DialogInterface.BUTTON_NEGATIVE) {
++            dialog.dismiss();
++        }
++    }
++
++    private void startProgress() {
++        if(mProgressDialog != null) {
++            stopProgress();
++        }
++        mProgressDialog = new ProgressDialog(mContext);
++        mProgressDialog.setIndeterminate(true);
++        mProgressDialog.setTitle(mContext.getString(R.string.font_picker_title));
++        mProgressDialog.setMessage(mContext.getString(R.string.font_picker_progress));
++        mProgressDialog.setCancelable(false);
++        mProgressDialog.setCanceledOnTouchOutside(false);
++        mProgressDialog.show();
++    }
++
++    public void stopProgress() {
++        if (mProgressDialog != null) {
++            mProgressDialog.dismiss();
++            mProgressDialog = null;
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/src/com/android/settings/display/FontListAdapter.java b/src/com/android/settings/display/FontListAdapter.java
+new file mode 100644
+index 0000000000..d58bbb499c
+--- /dev/null
++++ b/src/com/android/settings/display/FontListAdapter.java
+@@ -0,0 +1,142 @@
++/*
++ * Copyright (C) 2018 The Dirty Unicorns Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ *
++ * Adapter for displaying a list of custom fonts with font Typeface
++ */
++ package com.android.settings.display;
++ import java.util.ArrayList;
++import java.util.Collections;
++import java.util.Comparator;
++import java.util.List;
++import java.util.Map;
++ import com.android.settings.R;
++ import android.content.Context;
++import android.content.FontInfo;
++import android.content.IFontService;
++import android.content.pm.ApplicationInfo;
++import android.content.pm.PackageManager;
++import android.graphics.Typeface;
++import android.graphics.drawable.Drawable;
++import android.os.RemoteException;
++import android.os.ServiceManager;
++import android.text.TextUtils;
++import android.util.Log;
++import android.view.LayoutInflater;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.BaseAdapter;
++import android.widget.ImageView;
++import android.widget.TextView;
++ public class FontListAdapter extends BaseAdapter {
++    private static final String TAG = "FontListAdapter";
++     private IFontService mFontService;
++    private List<FontInfo> mFontInfo = new ArrayList<FontInfo>();
++    private Context mContext;
++    private LayoutInflater mInflater;
++    private PackageManager mPm;
++     public FontListAdapter(Context context) {
++        mContext = context;
++        mInflater = LayoutInflater.from(context);
++        mFontService = IFontService.Stub.asInterface(
++                ServiceManager.getService("dufont"));
++        mPm = context.getPackageManager();
++        loadFontList();
++    }
++     public void loadFontList() {
++        mFontInfo.clear();
++        try {
++            Map<String, List<FontInfo>> fontMap = mFontService.getAllFonts();
++            for (Map.Entry<String, List<FontInfo>> entry : fontMap.entrySet()) {
++                String packageName = entry.getKey();
++                List<FontInfo> fonts = entry.getValue();
++                // manually add system font after we sort
++                if (TextUtils.equals(packageName, FontInfo.DEFAULT_FONT_PACKAGE)) {
++                    continue;
++                }
++                for (FontInfo font : fonts) {
++                    mFontInfo.add(new FontInfo(font));
++                }
++            }
++            Collections.sort(mFontInfo);
++        } catch (RemoteException e) {
++            Log.e(TAG, "Error in populating list");
++        }
++        mFontInfo.add(0, FontInfo.getDefaultFontInfo());
++        notifyDataSetChanged();
++    }
++     @Override
++    public int getCount() {
++        return mFontInfo.size();
++    }
++     @Override
++    public FontInfo getItem(int position) {
++        return mFontInfo.get(position);
++    }
++     @Override
++    public long getItemId(int position) {
++        return 0;
++    }
++     @Override
++    public View getView(int position, View convertView, ViewGroup parent) {
++        ViewHolder holder;
++        final Context ctx = mContext;
++        if (convertView != null) {
++            holder = (ViewHolder) convertView.getTag();
++        } else {
++            convertView = mInflater.inflate(R.layout.font_item, null, false);
++            holder = new ViewHolder();
++            convertView.setTag(holder);
++            holder.title = (TextView) convertView.findViewById(com.android.internal.R.id.title);
++            holder.summary = (TextView) convertView
++                    .findViewById(com.android.internal.R.id.summary);
++            holder.icon = (ImageView) convertView.findViewById(R.id.icon);
++        }
++        FontInfo info = getItem(position);
++        Typeface.Builder builder = new Typeface.Builder(info.previewPath);
++        Typeface tf = builder.build();
++        holder.title.setTypeface(tf);
++        holder.title.setText(info.fontName.replace("_", " "));
++        holder.summary.setTypeface(tf);
++        holder.summary.setText(getPackageLabel(info.packageName).replace("_", " "));
++        holder.icon.setImageDrawable(getPackageDrawable(info.packageName));
++        return convertView;
++    }
++     private String getPackageLabel(String packageName) {
++        String label = null;
++        if (packageName.equals("android")) {
++            return "Android";
++        }
++        try {
++            ApplicationInfo info = mPm.getApplicationInfo(packageName, 0);
++            label = (String) info.loadLabel(mPm);
++        } finally {
++            return label;
++        }
++    }
++     private Drawable getPackageDrawable(String packageName) {
++        Drawable icon = null;
++        try {
++            ApplicationInfo info = mPm.getApplicationInfo(packageName, 0);
++            icon = info.loadIcon(mPm);
++        } finally {
++            return icon;
++        }
++    }
++     private static class ViewHolder {
++        TextView title;
++        TextView summary;
++        ImageView icon;
++    }
++}
+diff --git a/src/com/android/settings/display/FontPickerPreferenceController.java b/src/com/android/settings/display/FontPickerPreferenceController.java
+new file mode 100644
+index 0000000000..b70de991f0
+--- /dev/null
++++ b/src/com/android/settings/display/FontPickerPreferenceController.java
+@@ -0,0 +1,99 @@
++/*
++ * Copyright (C) 2017 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.display;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.Comparator;
++import java.util.List;
++import java.util.Map;
++
++import com.android.settings.core.PreferenceControllerMixin;
++import com.android.settingslib.core.AbstractPreferenceController;
++import com.android.settingslib.core.lifecycle.Lifecycle;
++import com.android.settingslib.core.lifecycle.LifecycleObserver;
++import com.android.settingslib.core.lifecycle.events.OnResume;
++
++import android.app.Fragment;
++import android.content.Context;
++import android.content.FontInfo;
++import android.content.IFontService;
++import android.content.pm.PackageManager;
++import android.os.RemoteException;
++import android.os.ServiceManager;
++import android.provider.Settings;
++import android.support.v7.preference.ListPreference;
++import android.support.v7.preference.Preference;
++import android.support.v7.preference.PreferenceScreen;
++import android.support.v7.preference.Preference.OnPreferenceClickListener;
++import android.text.TextUtils;
++import android.util.Log;
++
++public class FontPickerPreferenceController extends AbstractPreferenceController
++        implements PreferenceControllerMixin, LifecycleObserver, OnResume {
++    private static final String TAG = "FontPickerPreferenceController";
++    private static final String KEY_FONT_PICKER_FRAGMENT_PREF = "custom_font";
++
++    private FontDialogPreference mFontPreference;
++    private IFontService mFontService;
++
++    public FontPickerPreferenceController(Context context, Lifecycle lifecycle) {
++        super(context);
++        if (lifecycle != null) {
++            lifecycle.addObserver(this);
++        }
++        mFontService = IFontService.Stub.asInterface(
++                ServiceManager.getService("dufont"));
++    }
++
++    @Override
++    public void onResume() {
++        if (mFontPreference == null) {
++            return;
++        }
++        mFontPreference.setSummary(getCurrentFontInfo().fontName.replace("_", " "));
++    }
++
++    @Override
++    public void displayPreference(PreferenceScreen screen) {
++        mFontPreference = (FontDialogPreference) screen.findPreference(KEY_FONT_PICKER_FRAGMENT_PREF);
++        mFontPreference.setEnabled(true);
++    }
++
++    @Override
++    public boolean isAvailable() {
++        return true;
++    }
++
++    @Override
++    public String getPreferenceKey() {
++        return KEY_FONT_PICKER_FRAGMENT_PREF;
++    }
++
++    private FontInfo getCurrentFontInfo() {
++        try {
++            return mFontService.getFontInfo();
++        } catch (RemoteException e) {
++            return FontInfo.getDefaultFontInfo();
++        }
++    }
++
++    public void stopProgress() {
++        mFontPreference.stopProgress();
++    }
++}
+\ No newline at end of file
+-- 
+2.20.1
+

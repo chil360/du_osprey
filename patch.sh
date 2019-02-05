@@ -6,12 +6,9 @@ TOP=${PWD}
 # PATCHES                                                   #
 #############################################################
 
-cd hardware/qcom/display-caf/msm8916/
-git am -3 $TOP/0002-display-Include-missing-headers.patch
-git am -3 $TOP/0003-Make-hwc_vsync-thread-realtime.patch
-git am -3 $TOP/0004-hwcomposer-Work-around-overzealous-fortify-checks.patch
-cd $TOP
-
+##
+##  Camera HAL1
+##
 cd build/make
 git am -3 $TOP/0001-soong_config-Add-legacy-HAL1-camera.patch
 cd $TOP
@@ -30,12 +27,34 @@ cd frameworks/base
 git am -3 $TOP/0001-CameraServiceProxy-Loosen-UID-check.patch
 cd $TOP
 
+cd system/sepolicy
+git am -3 $TOP/0001-Add-rules-required-for-TARGET_HAS_LEGACY_CAMERA_HAL1.patch
+cd $TOP
+
+##
+##  Disable Battery LED
+##
 cd device/motorola/msm8916-common
-git am -3 $TOP/0001-DO-NOT-MERGE-msm8916-common-Force-battery-led-off.patch
+git am -3 $TOP/0001-DNM-Disable-Battery-LED.patch
+cd $TOP
+
+##
+##  Custom Fonts
+##
+cd frameworks/base
+git am -3 $TOP/0001-DU-Custom-Fonts-1-4.patch
+cd $TOP
+
+cd packages/apps/Settings
+git am -3 $TOP/0001-DU-Custom-Fonts-2-4.patch
 cd $TOP
 
 cd system/sepolicy
-git am -3 $TOP/0001-Add-rules-required-for-TARGET_HAS_LEGACY_CAMERA_HAL1.patch
+git am -3 $TOP/0001-DU-Custom-Fonts-3-4.patch
+cd $TOP
+
+cd vendor/themes
+git am -3 $TOP/0001-DU-Custom-Fonts-4-4.patch
 cd $TOP
 
 #############################################################
@@ -43,7 +62,3 @@ cd $TOP
 #############################################################
 
 # Example: repopick [CHANGE_NUMBER]
-
-# system/sepolicy
-repopick 5683-5686
-

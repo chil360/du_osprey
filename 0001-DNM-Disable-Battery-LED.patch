@@ -1,0 +1,33 @@
+From 633ef7074cabb12e3d4b235e77fccf0c43ea5a8f Mon Sep 17 00:00:00 2001
+From: Kyle Harrison <khwebmail@gmail.com>
+Date: Mon, 24 Dec 2018 00:10:26 +0000
+Subject: [PATCH] [DNM] Disable Battery LED
+
+---
+ light/Light.cpp | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/light/Light.cpp b/light/Light.cpp
+index 75d750d..4375aca 100644
+--- a/light/Light.cpp
++++ b/light/Light.cpp
+@@ -120,12 +120,12 @@ void Light::setSpeakerBatteryLightLocked() {
+ }
+ 
+ void Light::setSpeakerLightLocked(const LightState& state) {
+-    if (isLit(state)) {
+-        mChargingLed << DEFAULT_MAX_BRIGHTNESS << std::endl;
+-    } else {
++//    if (isLit(state)) {
++//        mChargingLed << DEFAULT_MAX_BRIGHTNESS << std::endl;
++//    } else {
+         // Lights off
+         mChargingLed << 0 << std::endl;
+-    }
++//    }
+ }
+ 
+ }  // namespace implementation
+-- 
+2.20.1
+
