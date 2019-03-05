@@ -1,4 +1,4 @@
-From 3f35552ac358c7a1fc30c38897f21e5e923146d6 Mon Sep 17 00:00:00 2001
+From f2ab1844697726ac7bb78273c3b632601b059d70 Mon Sep 17 00:00:00 2001
 From: Kyle Harrison <khwebmail@gmail.com>
 Date: Fri, 1 Feb 2019 19:03:10 +0000
 Subject: [PATCH] DU Custom Fonts [4/4]
@@ -21262,12 +21262,12 @@ index 4459a24..9aa9cb1 100644
 +
  </resources>
 diff --git a/themes.mk b/themes.mk
-index cce360f..3ed1a0d 100644
+index cd62402..6efe75b 100644
 --- a/themes.mk
 +++ b/themes.mk
-@@ -15,3 +15,7 @@ PRODUCT_PACKAGES += \
-     SettingsIntelligenceDark \
+@@ -16,3 +16,7 @@ PRODUCT_PACKAGES += \
      SystemDark \
+     SystemUiDark \
      WellbeingDark
 +
 +# Fonts

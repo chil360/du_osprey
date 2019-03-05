@@ -57,6 +57,25 @@ cd vendor/themes
 git am -3 $TOP/0001-DU-Custom-Fonts-4-4.patch
 cd $TOP
 
+##
+##  Fix Font map with EXCLUDE_SERIF_FONTS
+##
+cd frameworks/base
+git am -3 $TOP/0001-fonts-Build-different-fonts.xml-if-EXCLUDE_SERIF_FON.patch
+cd $TOP
+
+##
+##  Lag Fixes
+##
+cd frameworks/base
+git am -3 $TOP/0001-Improve-performance-of-unclipped-save-layers.patch
+cd $TOP
+
+cd external/skia
+git am -3 $TOP/0001-Add-rect-parameter-to-makeImageSnapshot-and-stop-usi.patch
+git am -3 $TOP/0002-fGpu-is-null-when-GrGpuResource-release.patch
+cd $TOP
+
 #############################################################
 # CHERRYPICKS                                               #
 #############################################################
