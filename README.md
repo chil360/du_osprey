@@ -13,11 +13,9 @@ What's working?
  - WiFi
  - Storage
  - 4G
- - Camera HDR - Use provided OpenCamera
+ - Camera HDR
  - Selinux Enforcing
-
-Not working?
- - VoLTE
+ - VoLTE (credits to [@nicorg2515](https://github.com/nicorg2515))
 
 Download
 --------
