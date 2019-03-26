@@ -59,7 +59,8 @@ $
 # ...and run to prepare our devices list
 $ . build/envsetup.sh
 # ... now run
-$ brunch osprey
+$ lunch du_osprey-userdebug
+$ mka bacon
 ```
 
 Please see the [Dirty Unicorns website](https://dirtyunicorns.com/) for further information.
