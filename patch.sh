@@ -76,6 +76,13 @@ git am -3 $TOP/0001-Add-rect-parameter-to-makeImageSnapshot-and-stop-usi.patch
 git am -3 $TOP/0002-fGpu-is-null-when-GrGpuResource-release.patch
 cd $TOP
 
+##
+##  Audio Fixes
+##
+cd frameworks/av
+git am -3 $TOP/0001-Request-to-reset-effect-buffer-in-clearInputBuffer.patch
+cd $TOP
+
 #############################################################
 # CHERRYPICKS                                               #
 #############################################################
