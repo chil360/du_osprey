@@ -83,6 +83,13 @@ cd frameworks/av
 git am -3 $TOP/0001-Request-to-reset-effect-buffer-in-clearInputBuffer.patch
 cd $TOP
 
+##
+##  Manual Network Selection
+##
+cd packages/services/Telephony
+git am -3 $TOP/0001-Allow-to-disable-the-new-scan-API-for-manual-network.patch
+cd $TOP
+
 #############################################################
 # CHERRYPICKS                                               #
 #############################################################
