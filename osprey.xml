@@ -29,7 +29,7 @@
         <remove-project path="hardware/qcom/power" name="android_hardware_qcom_power" remote="du" revision="p9x-caf" />
         <project path="hardware/qcom/power" name="GZOSP/hardware_qcom_power" remote="github" revision="9.0" />
 
-	<!-- ARM Developer GCC 8.2 kernel toolchain -->
-	<project name="chil360/prebuilts_gcc_linux-x86_arm_arm-eabi-8.2" path="prebuilts/gcc/linux-x86/arm/arm-eabi-8.2" remote="github" revision="master" />
+	<!-- ARM Developer GCC 8.3 kernel toolchain -->
+	<project name="chil360/prebuilts_gcc_linux-x86_arm_arm-eabi-8.3" path="prebuilts/gcc/linux-x86/arm/arm-eabi-8.3" remote="github" revision="master" />
 
 </manifest>
