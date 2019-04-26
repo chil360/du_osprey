@@ -5,7 +5,7 @@
 	<project name="chil360/android_device_motorola_osprey" path="device/motorola/osprey" remote="github" revision="du-p9x" />
 	<project name="chil360/android_device_motorola_msm8916-common" path="device/motorola/msm8916-common" remote="github" revision="du-p9x" />
 	<project name="chil360/android_kernel_motorola_msm8916" path="kernel/motorola/msm8916" remote="github" revision="9.0" />
-	<project name="chil360/proprietary_vendor_motorola" path="vendor/motorola" remote="github" revision="lineage-16.0" />
+	<project name="chil360/proprietary_vendor_motorola" path="vendor/motorola" remote="github" revision="9.0" />
 
 	<!-- Sepolicy -->
 	<project name="chil360/device_qcom_sepolicy-legacy" path="device/qcom/sepolicy-legacy" remote="github" revision="du-p9x" />
