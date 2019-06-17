@@ -1,6 +1,6 @@
-From 98df93f88b9a6bc94a5e2625bbc0382b0e381d97 Mon Sep 17 00:00:00 2001
-From: Kyle Harrison <khwebmail@gmail.com>
-Date: Fri, 5 Apr 2019 15:58:01 +0100
+From d18cd4cafc0f67d109e52b5e330bb7696281a9c4 Mon Sep 17 00:00:00 2001
+From: Nico <nicorg2529@gmail.com>
+Date: Fri, 8 Mar 2019 09:49:43 +0000
 Subject: [PATCH] Allow to disable the new scan API for manual network search.
 
 The implementation to attempt new API and then fallback after
@@ -16,15 +16,20 @@ and start network search through old API directly.
 
 Change-Id: Iac3d70d91ee449a3a2ce4e5729176e09cb80b711
 ---
- res/values/config.xml                          | 6 ++++++
+ res/values/config.xml                          | 8 ++++++++
  src/com/android/phone/NetworkQueryService.java | 8 ++++++++
- 2 files changed, 14 insertions(+)
+ 2 files changed, 16 insertions(+)
 
 diff --git a/res/values/config.xml b/res/values/config.xml
-index 2e18a7553..32d4905b3 100644
+index 2e18a7553..a68ce0861 100644
 --- a/res/values/config.xml
 +++ b/res/values/config.xml
-@@ -251,4 +251,10 @@
+@@ -247,8 +247,16 @@
+          When this is true, the Telephony stack is able to add additional audio to the outgoing
+          audio stream which the remote party will be able to hear. -->
+     <bool name="config_support_telephony_audio_device">false</bool>
++
+     <!-- To disable/enable CallForwardUnconditional Timer -->
      <bool name="config_enable_cfu_time">false</bool>
      <!-- To disable clir query when ut enable under CMCC -->
      <bool name="config_disable_clir_over_ut">false</bool>
@@ -33,10 +38,11 @@ index 2e18a7553..32d4905b3 100644
 +         disabled.
 +         If set to true, it will send network query through Phone.getAvailableNetworks() directly
 +         rather than attempt to query through TelephonyManager.requestNetworkScan() first. -->
-+    <bool name="config_requestNetworkScan_disable">false</bool>
++    <bool name="config_disable_TelephonyManager_network_scan">false</bool>
++
  </resources>
 diff --git a/src/com/android/phone/NetworkQueryService.java b/src/com/android/phone/NetworkQueryService.java
-index 22b55091e..8c8f22ef1 100644
+index 22b55091e..d2b90c004 100644
 --- a/src/com/android/phone/NetworkQueryService.java
 +++ b/src/com/android/phone/NetworkQueryService.java
 @@ -195,6 +195,14 @@ public class NetworkQueryService extends Service {
@@ -45,9 +51,9 @@ index 22b55091e..8c8f22ef1 100644
  
 +                            final boolean isRequestNetworkScanDisabled =
 +                                    getApplicationContext().getResources().getBoolean(
-+                                            R.bool.config_requestNetworkScan_disable);
++                                            R.bool.config_disable_TelephonyManager_network_scan);
 +                            if (isRequestNetworkScanDisabled && isIncrementalResult) {
-+                                if (DBG) log("network scan via TelephonManager is disabled");
++                                if (DBG) log("network scan via TelephonyManager is disabled");
 +                                isIncrementalResult = false;
 +                            }
 +
@@ -55,5 +61,5 @@ index 22b55091e..8c8f22ef1 100644
                                  if (DBG) log("start network scan via TelephonManager");
                                  TelephonyManager tm = (TelephonyManager) getSystemService(
 -- 
-2.21.0
+2.22.0
 
