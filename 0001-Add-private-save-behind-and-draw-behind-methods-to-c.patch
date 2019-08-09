@@ -1,0 +1,1219 @@
+From 1d5078364c1b670259c2b5c237d1b2f810b768e9 Mon Sep 17 00:00:00 2001
+From: Derek Sollenberger <djsollen@google.com>
+Date: Thu, 4 Apr 2019 11:49:14 -0400
+Subject: [PATCH] Add private save-behind and draw-behind methods to canvas.
+
+The draw-behind  is a variant of drawPaint but is automatically clipped
+to the bounds of the most recent saveBehind buffer (axis-aligned bounds).
+
+No public exposure outside of the Android framework.
+
+Impl is pretty simple (its a variant of drawPaint)
+- find the most recent saveBehind device bounds
+- if there is none, draw nothing, else
+  - temporarily intersect the device's clip with that bounds
+  - drawPaint
+  - restore the clip
+
+This patches did not apply cleanly and have been updated to compile
+with a previous version of Skia. It was cherry-picked from the
+following 3 Skia commits:
+148b7fd3ad9c29dec0052de624c26ff291ef8f0a
+d567408362bf7847d6000f6786f9a7b2c9d0b88b
+9adc82c73df0ef25b708cae8aa48ef9c39ed4c67
+
+Bug: 129117085
+Test: None
+Change-Id: I291f57885de6e95f749bf5cdb70ac16a5781ffb1
+---
+ include/android/SkAndroidFrameworkUtils.h |   3 +
+ include/core/SkCanvas.h                   |  23 ++++-
+ include/core/SkOverdrawCanvas.h           |   1 +
+ include/core/SkPicture.h                  |   3 +-
+ include/core/SkRect.h                     |   3 +
+ include/utils/SkLuaCanvas.h               |   1 +
+ include/utils/SkNWayCanvas.h              |   2 +
+ include/utils/SkNoDrawCanvas.h            |   2 +
+ include/utils/SkPaintFilterCanvas.h       |   1 +
+ src/android/SkAndroidFrameworkUtils.cpp   |   6 +-
+ src/core/SkBitmapDevice.cpp               |   4 +
+ src/core/SkBitmapDevice.h                 |   1 +
+ src/core/SkCanvas.cpp                     | 118 ++++++++++++++++++++++
+ src/core/SkCanvasPriv.h                   |   8 ++
+ src/core/SkDevice.cpp                     |   4 +
+ src/core/SkDevice.h                       |   2 +
+ src/core/SkLiteDL.cpp                     |  29 +++++-
+ src/core/SkLiteDL.h                       |   2 +
+ src/core/SkLiteRecorder.cpp               |   7 ++
+ src/core/SkLiteRecorder.h                 |   2 +
+ src/core/SkOverdrawCanvas.cpp             |   4 +
+ src/core/SkPictureFlat.h                  |   8 +-
+ src/core/SkPicturePlayback.cpp            |  18 ++++
+ src/core/SkPictureRecord.cpp              |  29 ++++++
+ src/core/SkPictureRecord.h                |   2 +
+ src/core/SkRecordDraw.cpp                 |  12 +++
+ src/core/SkRecorder.cpp                   |   9 ++
+ src/core/SkRecorder.h                     |   2 +
+ src/core/SkRecords.h                      |   7 ++
+ src/core/SkSpecialImage.cpp               |  19 ++++
+ src/core/SkSpecialImage.h                 |   3 +
+ src/gpu/SkGpuDevice.cpp                   |  26 +++++
+ src/gpu/SkGpuDevice.h                     |   1 +
+ src/utils/SkLuaCanvas.cpp                 |   5 +
+ src/utils/SkNWayCanvas.cpp                |  19 ++++
+ src/utils/SkPaintFilterCanvas.cpp         |   7 ++
+ tests/PictureTest.cpp                     |   8 ++
+ tools/debugger/SkDebugCanvas.cpp          |   5 +
+ tools/debugger/SkDebugCanvas.h            |   3 +-
+ 39 files changed, 400 insertions(+), 9 deletions(-)
+
+diff --git a/include/android/SkAndroidFrameworkUtils.h b/include/android/SkAndroidFrameworkUtils.h
+index 46d251626e..c2bf2b2bde 100644
+--- a/include/android/SkAndroidFrameworkUtils.h
++++ b/include/android/SkAndroidFrameworkUtils.h
+@@ -9,6 +9,7 @@
+ #define SkAndroidFrameworkUtils_DEFINED
+ 
+ #include "SkTypes.h"
++#include "SkRect.h"
+ 
+ #ifdef SK_BUILD_FOR_ANDROID_FRAMEWORK
+ 
+@@ -32,6 +33,8 @@ public:
+     static bool clipWithStencil(SkCanvas* canvas);
+ #endif //SK_SUPPORT_GPU
+ 
++    static int SaveBehind(SkCanvas* canvas, const SkRect* subset);
++
+     static void SafetyNetLog(const char*);
+ };
+ 
+diff --git a/include/core/SkCanvas.h b/include/core/SkCanvas.h
+index 2f83b66fdd..51c285fc08 100644
+--- a/include/core/SkCanvas.h
++++ b/include/core/SkCanvas.h
+@@ -739,7 +739,7 @@ public:
+         Call restoreToCount() with returned value to restore this and subsequent saves.
+ 
+         @param layerRec  layer state
+-        @return          depth of save state stack
++        @return          depth of save state stack before this call was made.
+     */
+     int saveLayer(const SaveLayerRec& layerRec);
+ 
+@@ -2484,6 +2484,8 @@ protected:
+     virtual SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec& ) {
+         return kFullLayer_SaveLayerStrategy;
+     }
++    // returns true if we should actually perform the saveBehind, or false if we should just save.
++    virtual bool onDoSaveBehind(const SkRect*) { return true; }
+     virtual void willRestore() {}
+     virtual void didRestore() {}
+     virtual void didConcat(const SkMatrix& ) {}
+@@ -2520,6 +2522,7 @@ protected:
+     virtual void onDrawDrawable(SkDrawable* drawable, const SkMatrix* matrix);
+ 
+     virtual void onDrawPaint(const SkPaint& paint);
++    virtual void onDrawBehind(const SkPaint& paint);
+     virtual void onDrawRect(const SkRect& rect, const SkPaint& paint);
+     virtual void onDrawRegion(const SkRegion& region, const SkPaint& paint);
+     virtual void onDrawOval(const SkRect& rect, const SkPaint& paint);
+@@ -2674,6 +2677,7 @@ private:
+     void internalSetMatrix(const SkMatrix&);
+ 
+     friend class SkAndroidFrameworkUtils;
++    friend class SkCanvasPriv;
+     friend class SkDrawIter;        // needs setupDrawForLayerDevice()
+     friend class AutoDrawLooper;
+     friend class SkDebugCanvas;     // needs experimental fAllowSimplifyClip
+@@ -2694,6 +2698,22 @@ private:
+     SkCanvas(const SkBitmap&, std::unique_ptr<SkRasterHandleAllocator>,
+              SkRasterHandleAllocator::Handle);
+ 
++    /** Experimental
++     *  Saves the specified subset of the current pixels in the current layer,
++     *  and then clears those pixels to transparent black.
++     *  Restores the pixels on restore() by drawing them in SkBlendMode::kDstOver.
++     *
++     *  @param subset   conservative bounds of the area to be saved / restored.
++     *  @return depth of save state stack before this call was made.
++     */
++    int only_axis_aligned_saveBehind(const SkRect* subset);
++
++    /**
++     *  Like drawPaint, but magically clipped to the most recent saveBehind buffer rectangle.
++     *  If there is no active saveBehind, then this draws nothing.
++     */
++    void drawClippedToSaveBehind(const SkPaint&);
++
+     void resetForNextPicture(const SkIRect& bounds);
+ 
+     // needs gettotalclip()
+@@ -2717,6 +2737,7 @@ private:
+                                 SrcRectConstraint);
+     void internalDrawPaint(const SkPaint& paint);
+     void internalSaveLayer(const SaveLayerRec&, SaveLayerStrategy);
++    void internalSaveBehind(const SkRect*);
+     void internalDrawDevice(SkBaseDevice*, int x, int y, const SkPaint*, SkImage* clipImage,
+                             const SkMatrix& clipMatrix);
+ 
+diff --git a/include/core/SkOverdrawCanvas.h b/include/core/SkOverdrawCanvas.h
+index 284fe6cd97..eda33ddf41 100644
+--- a/include/core/SkOverdrawCanvas.h
++++ b/include/core/SkOverdrawCanvas.h
+@@ -31,6 +31,7 @@ public:
+     void onDrawPatch(const SkPoint[12], const SkColor[4], const SkPoint[4], SkBlendMode,
+                      const SkPaint&) override;
+     void onDrawPaint(const SkPaint&) override;
++    void onDrawBehind(const SkPaint& paint) override;
+     void onDrawRect(const SkRect&, const SkPaint&) override;
+     void onDrawRegion(const SkRegion&, const SkPaint&) override;
+     void onDrawOval(const SkRect&, const SkPaint&) override;
+diff --git a/include/core/SkPicture.h b/include/core/SkPicture.h
+index b2beb56b86..9452feeda9 100644
+--- a/include/core/SkPicture.h
++++ b/include/core/SkPicture.h
+@@ -168,10 +168,11 @@ private:
+     // V59: No more LocalSpace option on PictureImageFilter
+     // V60: Remove flags in picture header
+     // V61: Change SkDrawPictureRec to take two colors rather than two alphas
++    // V62: Add saveBehind
+ 
+     // Only SKPs within the min/current picture version range (inclusive) can be read.
+     static const uint32_t     MIN_PICTURE_VERSION = 56;     // august 2017
+-    static const uint32_t CURRENT_PICTURE_VERSION = 61;
++    static const uint32_t CURRENT_PICTURE_VERSION = 62;
+ 
+     static bool IsValidPictInfo(const SkPictInfo& info);
+     static sk_sp<SkPicture> Forwardport(const SkPictInfo&,
+diff --git a/include/core/SkRect.h b/include/core/SkRect.h
+index f9a5bff4ff..dd66d75076 100644
+--- a/include/core/SkRect.h
++++ b/include/core/SkRect.h
+@@ -154,6 +154,9 @@ struct SK_API SkIRect {
+     */
+     int32_t y() const { return fTop; }
+ 
++    // Experimental
++    SkIPoint topLeft() const { return {fLeft, fTop}; }
++
+     /** Returns span on the x-axis. This does not check if SkIRect is sorted, or if
+         result fits in 32-bit signed integer; result may be negative.
+ 
+diff --git a/include/utils/SkLuaCanvas.h b/include/utils/SkLuaCanvas.h
+index 2fef2c0785..fc2e73d827 100644
+--- a/include/utils/SkLuaCanvas.h
++++ b/include/utils/SkLuaCanvas.h
+@@ -24,6 +24,7 @@ public:
+ protected:
+     void willSave() override;
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec&) override;
++    bool onDoSaveBehind(const SkRect*) override;
+     void willRestore() override;
+ 
+     void didConcat(const SkMatrix&) override;
+diff --git a/include/utils/SkNWayCanvas.h b/include/utils/SkNWayCanvas.h
+index a3e567ef89..57bd6de1eb 100644
+--- a/include/utils/SkNWayCanvas.h
++++ b/include/utils/SkNWayCanvas.h
+@@ -33,6 +33,7 @@ protected:
+ 
+     void willSave() override;
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec&) override;
++    bool onDoSaveBehind(const SkRect*) override;
+     void willRestore() override;
+ 
+     void didConcat(const SkMatrix&) override;
+@@ -56,6 +57,7 @@ protected:
+                              const SkPaint& paint) override;
+ 
+     void onDrawPaint(const SkPaint&) override;
++    void onDrawBehind(const SkPaint&) override;
+     void onDrawPoints(PointMode, size_t count, const SkPoint pts[], const SkPaint&) override;
+     void onDrawRect(const SkRect&, const SkPaint&) override;
+     void onDrawOval(const SkRect&, const SkPaint&) override;
+diff --git a/include/utils/SkNoDrawCanvas.h b/include/utils/SkNoDrawCanvas.h
+index 7b3eaf6b18..65d7403194 100644
+--- a/include/utils/SkNoDrawCanvas.h
++++ b/include/utils/SkNoDrawCanvas.h
+@@ -35,6 +35,7 @@ public:
+ 
+ protected:
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec& rec) override;
++    bool onDoSaveBehind(const SkRect*) override;
+ 
+     // No-op overrides for aborting rasterization earlier than SkNullBlitter.
+     void onDrawDRRect(const SkRRect&, const SkRRect&, const SkPaint&) override {}
+@@ -51,6 +52,7 @@ protected:
+                      const SkPaint&) override {}
+ 
+     void onDrawPaint(const SkPaint&) override {}
++    void onDrawBehind(const SkPaint&) override {}
+     void onDrawPoints(PointMode, size_t, const SkPoint[], const SkPaint&) override {}
+     void onDrawRect(const SkRect&, const SkPaint&) override {}
+     void onDrawRegion(const SkRegion&, const SkPaint&) override {}
+diff --git a/include/utils/SkPaintFilterCanvas.h b/include/utils/SkPaintFilterCanvas.h
+index d6689b91bc..4cf29dbd18 100644
+--- a/include/utils/SkPaintFilterCanvas.h
++++ b/include/utils/SkPaintFilterCanvas.h
+@@ -65,6 +65,7 @@ protected:
+     virtual bool onFilter(SkTCopyOnFirstWrite<SkPaint>* paint, Type type) const = 0;
+ 
+     void onDrawPaint(const SkPaint&) override;
++    void onDrawBehind(const SkPaint&) override;
+     void onDrawPoints(PointMode, size_t count, const SkPoint pts[], const SkPaint&) override;
+     void onDrawRect(const SkRect&, const SkPaint&) override;
+     void onDrawRRect(const SkRRect&, const SkPaint&) override;
+diff --git a/src/android/SkAndroidFrameworkUtils.cpp b/src/android/SkAndroidFrameworkUtils.cpp
+index f0a7b8a2fc..4eeadd0eba 100644
+--- a/src/android/SkAndroidFrameworkUtils.cpp
++++ b/src/android/SkAndroidFrameworkUtils.cpp
+@@ -8,6 +8,7 @@
+ #include "SkAndroidFrameworkUtils.h"
+ #include "SkCanvas.h"
+ #include "SkDevice.h"
++#include "SkRect.h"
+ 
+ #if SK_SUPPORT_GPU
+ #include "GrStyle.h"
+@@ -54,9 +55,12 @@ bool SkAndroidFrameworkUtils::clipWithStencil(SkCanvas* canvas) {
+ }
+ #endif //SK_SUPPORT_GPU
+ 
++int SkAndroidFrameworkUtils::SaveBehind(SkCanvas* canvas, const SkRect* subset) {
++    return canvas->only_axis_aligned_saveBehind(subset);
++}
++
+ void SkAndroidFrameworkUtils::SafetyNetLog(const char* bugNumber) {
+     android_errorWriteLog(0x534e4554, bugNumber);
+ }
+ 
+ #endif // SK_BUILD_FOR_ANDROID_FRAMEWORK
+-
+diff --git a/src/core/SkBitmapDevice.cpp b/src/core/SkBitmapDevice.cpp
+index 3d66ba6dfc..06f1c25159 100644
+--- a/src/core/SkBitmapDevice.cpp
++++ b/src/core/SkBitmapDevice.cpp
+@@ -518,6 +518,10 @@ sk_sp<SkSpecialImage> SkBitmapDevice::snapSpecial() {
+     return this->makeSpecial(fBitmap);
+ }
+ 
++sk_sp<SkSpecialImage> SkBitmapDevice::snapBackImage(const SkIRect& bounds) {
++    return SkSpecialImage::CopyFromRaster(bounds, fBitmap, &this->surfaceProps());
++}
++
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+ sk_sp<SkSurface> SkBitmapDevice::makeSurface(const SkImageInfo& info, const SkSurfaceProps& props) {
+diff --git a/src/core/SkBitmapDevice.h b/src/core/SkBitmapDevice.h
+index b890066da6..de092efc1d 100644
+--- a/src/core/SkBitmapDevice.h
++++ b/src/core/SkBitmapDevice.h
+@@ -117,6 +117,7 @@ protected:
+     sk_sp<SkSpecialImage> makeSpecial(const SkBitmap&) override;
+     sk_sp<SkSpecialImage> makeSpecial(const SkImage*) override;
+     sk_sp<SkSpecialImage> snapSpecial() override;
++    sk_sp<SkSpecialImage> snapBackImage(const SkIRect&) override;
+ 
+     ///////////////////////////////////////////////////////////////////////////
+ 
+diff --git a/src/core/SkCanvas.cpp b/src/core/SkCanvas.cpp
+index b29a538717..75aff1c463 100644
+--- a/src/core/SkCanvas.cpp
++++ b/src/core/SkCanvas.cpp
+@@ -272,6 +272,14 @@ struct DeviceCM {
+     }
+ };
+ 
++namespace {
++// Encapsulate state needed to restore from saveBehind()
++struct BackImage {
++    sk_sp<SkSpecialImage> fImage;
++    SkIPoint              fLoc;
++};
++}
++
+ /*  This is the record we keep for each save/restore level in the stack.
+     Since a level optionally copies the matrix and/or stack, we have pointers
+     for these fields. If the value is copied for this level, the copy is
+@@ -290,6 +298,7 @@ public:
+         or a previous one in a lower level.)
+     */
+     DeviceCM*           fTopLayer;
++    std::unique_ptr<BackImage> fBackImage;
+     SkConservativeClip  fRasterClip;
+     SkMatrix            fMatrix;
+     int                 fDeferredSaveCount;
+@@ -1011,6 +1020,22 @@ int SkCanvas::saveLayer(const SaveLayerRec& origRec) {
+     return this->getSaveCount() - 1;
+ }
+ 
++int SkCanvas::only_axis_aligned_saveBehind(const SkRect* bounds) {
++    if (bounds && !this->getLocalClipBounds().intersects(*bounds)) {
++        // Assuming clips never expand, if the request bounds is outside of the current clip
++        // there is no need to copy/restore the area, so just devolve back to a regular save.
++        this->save();
++    } else {
++        bool doTheWork = this->onDoSaveBehind(bounds);
++        fSaveCount += 1;
++        this->internalSave();
++        if (doTheWork) {
++            this->internalSaveBehind(bounds);
++        }
++    }
++    return this->getSaveCount() - 1;
++}
++
+ void SkCanvas::DrawDeviceWithFilter(SkBaseDevice* src, const SkImageFilter* filter,
+                                     SkBaseDevice* dst, const SkIPoint& dstOrigin,
+                                     const SkMatrix& ctm) {
+@@ -1171,6 +1196,44 @@ int SkCanvas::saveLayerAlpha(const SkRect* bounds, U8CPU alpha) {
+     }
+ }
+ 
++void SkCanvas::internalSaveBehind(const SkRect* localBounds) {
++    SkIRect devBounds;
++    if (localBounds) {
++        SkRect tmp;
++        fMCRec->fMatrix.mapRect(&tmp, *localBounds);
++        if (!devBounds.intersect(tmp.round(), this->getDeviceClipBounds())) {
++            devBounds.setEmpty();
++        }
++    } else {
++        devBounds = this->getDeviceClipBounds();
++    }
++    if (devBounds.isEmpty()) {
++        return;
++    }
++
++    SkBaseDevice* device = this->getTopDevice();
++    if (nullptr == device) {   // Do we still need this check???
++        return;
++    }
++
++    // need the bounds relative to the device itself
++    devBounds.offset(-device->fOrigin.fX, -device->fOrigin.fY);
++
++    auto backImage = device->snapBackImage(devBounds);
++    if (!backImage) {
++        return;
++    }
++
++    // we really need the save, so we can wack the fMCRec
++    this->checkForDeferredSave();
++
++    fMCRec->fBackImage.reset(new BackImage{std::move(backImage), devBounds.topLeft()});
++
++    SkPaint paint;
++    paint.setBlendMode(SkBlendMode::kClear);
++    this->drawClippedToSaveBehind(paint);
++}
++
+ void SkCanvas::internalRestore() {
+     SkASSERT(fMCStack.count() != 0);
+ 
+@@ -1179,6 +1242,9 @@ void SkCanvas::internalRestore() {
+     // now detach it from fMCRec so we can pop(). Gets freed after its drawn
+     fMCRec->fLayer = nullptr;
+ 
++    // move this out before we do the actual restore
++    auto backImage = std::move(fMCRec->fBackImage);
++
+     // now do the normal restore()
+     fMCRec->~MCRec();       // balanced in save()
+     fMCStack.pop_back();
+@@ -1188,6 +1254,15 @@ void SkCanvas::internalRestore() {
+         FOR_EACH_TOP_DEVICE(device->restore(fMCRec->fMatrix));
+     }
+ 
++    if (backImage) {
++        SkPaint paint;
++        paint.setBlendMode(SkBlendMode::kDstOver);
++        const int x = backImage->fLoc.x();
++        const int y = backImage->fLoc.y();
++        this->getTopDevice()->drawSpecial(backImage->fImage.get(), x, y, paint,
++                                          nullptr, SkMatrix::I());
++    }
++
+     /*  Time to draw the layer's offscreen. We can't call the public drawSprite,
+         since if we're being recorded, we don't want to record this (the
+         recorder will have already recorded the restore).
+@@ -1710,6 +1785,11 @@ void SkCanvas::drawRect(const SkRect& r, const SkPaint& paint) {
+     this->onDrawRect(r.makeSorted(), paint);
+ }
+ 
++void SkCanvas::drawClippedToSaveBehind(const SkPaint& paint) {
++    TRACE_EVENT0("skia", TRACE_FUNC);
++    this->onDrawBehind(paint);
++}
++
+ void SkCanvas::drawRegion(const SkRegion& region, const SkPaint& paint) {
+     TRACE_EVENT0("skia", TRACE_FUNC);
+     if (region.isEmpty()) {
+@@ -2086,6 +2166,40 @@ void SkCanvas::onDrawRegion(const SkRegion& region, const SkPaint& paint) {
+     LOOPER_END
+ }
+ 
++void SkCanvas::onDrawBehind(const SkPaint& paint) {
++    SkIRect bounds;
++    SkDeque::Iter iter(fMCStack, SkDeque::Iter::kBack_IterStart);
++    for (;;) {
++        const MCRec* rec = (const MCRec*)iter.prev();
++        if (!rec) {
++            return; // no backimages, so nothing to draw
++        }
++        if (rec->fBackImage) {
++            bounds = SkIRect::MakeXYWH(rec->fBackImage->fLoc.fX, rec->fBackImage->fLoc.fY,
++                                       rec->fBackImage->fImage->width(),
++                                       rec->fBackImage->fImage->height());
++            break;
++        }
++    }
++
++    LOOPER_BEGIN(paint, SkDrawFilter::kPaint_Type, nullptr)
++
++    while (iter.next()) {
++        SkBaseDevice* dev = iter.fDevice;
++
++        dev->save();
++        // We use clipRegion because it is already defined to operate in dev-space
++        // (i.e. ignores the ctm). However, it is going to first translate by -origin,
++        // but we don't want that, so we undo that before calling in.
++        SkRegion rgn(bounds.makeOffset(dev->fOrigin.fX, dev->fOrigin.fY));
++        dev->clipRegion(rgn, SkClipOp::kIntersect);
++        dev->drawPaint(looper.paint());
++        dev->restore(fMCRec->fMatrix);
++    }
++
++    LOOPER_END
++}
++
+ void SkCanvas::onDrawOval(const SkRect& oval, const SkPaint& paint) {
+     SkASSERT(oval.isSorted());
+     if (paint.canComputeFastBounds()) {
+@@ -2960,6 +3074,10 @@ SkCanvas::SaveLayerStrategy SkNoDrawCanvas::getSaveLayerStrategy(const SaveLayer
+     return kNoLayer_SaveLayerStrategy;
+ }
+ 
++bool SkNoDrawCanvas::onDoSaveBehind(const SkRect*) {
++    return false;
++}
++
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+ static_assert((int)SkRegion::kDifference_Op         == (int)kDifference_SkClipOp, "");
+diff --git a/src/core/SkCanvasPriv.h b/src/core/SkCanvasPriv.h
+index 12d9fce027..e1eb02fd45 100644
+--- a/src/core/SkCanvasPriv.h
++++ b/src/core/SkCanvasPriv.h
+@@ -33,6 +33,14 @@ public:
+     // return the byte-size of the lattice, even if the buffer is null
+     // storage must be 4-byte aligned
+     static size_t WriteLattice(void* storage, const SkCanvas::Lattice&);
++
++    static int SaveBehind(SkCanvas* canvas, const SkRect* subset) {
++        return canvas->only_axis_aligned_saveBehind(subset);
++    }
++
++    static void DrawBehind(SkCanvas* canvas, const SkPaint& paint) {
++        canvas->drawClippedToSaveBehind(paint);
++    }
+ };
+ 
+ #endif
+diff --git a/src/core/SkDevice.cpp b/src/core/SkDevice.cpp
+index 210af808c9..d857cdb0c8 100644
+--- a/src/core/SkDevice.cpp
++++ b/src/core/SkDevice.cpp
+@@ -544,6 +544,10 @@ sk_sp<SkSurface> SkBaseDevice::makeSurface(SkImageInfo const&, SkSurfaceProps co
+     return nullptr;
+ }
+ 
++sk_sp<SkSpecialImage> SkBaseDevice::snapBackImage(const SkIRect&) {
++    return nullptr;
++}
++
+ //////////////////////////////////////////////////////////////////////////////////////////
+ 
+ void SkBaseDevice::LogDrawScaleFactor(const SkMatrix& matrix, SkFilterQuality filterQuality) {
+diff --git a/src/core/SkDevice.h b/src/core/SkDevice.h
+index c7b993cf22..ccfbba8f6d 100644
+--- a/src/core/SkDevice.h
++++ b/src/core/SkDevice.h
+@@ -271,6 +271,8 @@ protected:
+ 
+     bool readPixels(const SkPixmap&, int x, int y);
+ 
++    virtual sk_sp<SkSpecialImage> snapBackImage(const SkIRect&);    // default returns null
++
+     ///////////////////////////////////////////////////////////////////////////
+ 
+     virtual GrContext* context() const { return nullptr; }
+diff --git a/src/core/SkLiteDL.cpp b/src/core/SkLiteDL.cpp
+index ed23acffe0..19cabf061e 100644
+--- a/src/core/SkLiteDL.cpp
++++ b/src/core/SkLiteDL.cpp
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include "SkCanvas.h"
++#include "SkCanvasPriv.h"
+ #include "SkData.h"
+ #include "SkDrawFilter.h"
+ #include "SkDrawShadowInfo.h"
+@@ -48,10 +49,11 @@ static const D* pod(const T* op, size_t offset = 0) {
+ 
+ namespace {
+ #define TYPES(M)                                                               \
+-    M(SetDrawFilter) M(Flush) M(Save) M(Restore) M(SaveLayer)                   \
++    M(SetDrawFilter) M(Flush) M(Save) M(Restore) M(SaveLayer) M(SaveBehind)     \
+     M(Concat) M(SetMatrix) M(Translate)                                         \
+     M(ClipPath) M(ClipRect) M(ClipRRect) M(ClipRegion)                          \
+-    M(DrawPaint) M(DrawPath) M(DrawRect) M(DrawRegion) M(DrawOval) M(DrawArc)   \
++    M(DrawPaint) M(DrawBehind)M(DrawPath) M(DrawRect)                           \
++    M(DrawRegion) M(DrawOval) M(DrawArc)                                        \
+     M(DrawRRect) M(DrawDRRect) M(DrawAnnotation) M(DrawDrawable) M(DrawPicture) \
+     M(DrawImage) M(DrawImageNine) M(DrawImageRect) M(DrawImageLattice)          \
+     M(DrawText) M(DrawPosText) M(DrawPosTextH)                                  \
+@@ -117,7 +119,16 @@ namespace {
+                            clipMatrix.isIdentity() ? nullptr : &clipMatrix, flags });
+         }
+     };
+-
++    struct SaveBehind final : Op {
++        static const auto kType = Type::SaveBehind;
++        SaveBehind(const SkRect* subset) {
++            if (subset) { this->subset = *subset; }
++        }
++        SkRect  subset = kUnset;
++        void draw(SkCanvas* c, const SkMatrix&) const {
++            SkCanvasPriv::SaveBehind(c, maybe_unset(subset));
++        }
++    };
+     struct Concat final : Op {
+         static const auto kType = Type::Concat;
+         Concat(const SkMatrix& matrix) : matrix(matrix) {}
+@@ -179,6 +190,12 @@ namespace {
+         SkPaint paint;
+         void draw(SkCanvas* c, const SkMatrix&) const { c->drawPaint(paint); }
+     };
++    struct DrawBehind final : Op {
++        static const auto kType = Type::DrawBehind;
++        DrawBehind(const SkPaint& paint) : paint(paint) {}
++        SkPaint paint;
++        void draw(SkCanvas* c, const SkMatrix&) const { SkCanvasPriv::DrawBehind(c, paint); }
++    };
+     struct DrawPath final : Op {
+         static const auto kType = Type::DrawPath;
+         DrawPath(const SkPath& path, const SkPaint& paint) : path(path), paint(paint) {}
+@@ -553,6 +570,9 @@ void SkLiteDL::saveLayer(const SkRect* bounds, const SkPaint* paint,
+                          const SkMatrix* clipMatrix, SkCanvas::SaveLayerFlags flags) {
+     this->push<SaveLayer>(0, bounds, paint, backdrop, clipMask, clipMatrix, flags);
+ }
++void SkLiteDL::saveBehind(const SkRect* subset) {
++    this->push<SaveBehind>(0, subset);
++}
+ 
+ void SkLiteDL::   concat(const SkMatrix& matrix)   { this->push   <Concat>(0, matrix); }
+ void SkLiteDL::setMatrix(const SkMatrix& matrix)   { this->push<SetMatrix>(0, matrix); }
+@@ -574,6 +594,9 @@ void SkLiteDL::clipRegion(const SkRegion& region, SkClipOp op) {
+ void SkLiteDL::drawPaint(const SkPaint& paint) {
+     this->push<DrawPaint>(0, paint);
+ }
++void SkLiteDL::drawBehind(const SkPaint& paint) {
++    this->push<DrawBehind>(0, paint);
++}
+ void SkLiteDL::drawPath(const SkPath& path, const SkPaint& paint) {
+     this->push<DrawPath>(0, path, paint);
+ }
+diff --git a/src/core/SkLiteDL.h b/src/core/SkLiteDL.h
+index 6d63657084..ff0fcb796d 100644
+--- a/src/core/SkLiteDL.h
++++ b/src/core/SkLiteDL.h
+@@ -34,6 +34,7 @@ public:
+     void save();
+     void saveLayer(const SkRect*, const SkPaint*, const SkImageFilter*, const SkImage*,
+                    const SkMatrix*, SkCanvas::SaveLayerFlags);
++    void saveBehind(const SkRect*);
+     void restore();
+ 
+     void    concat (const SkMatrix&);
+@@ -47,6 +48,7 @@ public:
+     void clipRegion(const SkRegion&, SkClipOp);
+ 
+     void drawPaint (const SkPaint&);
++    void drawBehind(const SkPaint&);
+     void drawPath  (const SkPath&, const SkPaint&);
+     void drawRect  (const SkRect&, const SkPaint&);
+     void drawRegion(const SkRegion&, const SkPaint&);
+diff --git a/src/core/SkLiteRecorder.cpp b/src/core/SkLiteRecorder.cpp
+index bd41ff3913..cc582e5978 100644
+--- a/src/core/SkLiteRecorder.cpp
++++ b/src/core/SkLiteRecorder.cpp
+@@ -37,6 +37,10 @@ SkCanvas::SaveLayerStrategy SkLiteRecorder::getSaveLayerStrategy(const SaveLayer
+                    rec.fSaveLayerFlags);
+     return SkCanvas::kNoLayer_SaveLayerStrategy;
+ }
++bool SkLiteRecorder::onDoSaveBehind(const SkRect* subset) {
++    fDL->saveBehind(subset);
++    return false;
++}
+ void SkLiteRecorder::willRestore() { fDL->restore(); }
+ 
+ void SkLiteRecorder::didConcat   (const SkMatrix& matrix)   { fDL->   concat(matrix); }
+@@ -63,6 +67,9 @@ void SkLiteRecorder::onClipRegion(const SkRegion& region, SkClipOp op) {
+ void SkLiteRecorder::onDrawPaint(const SkPaint& paint) {
+     fDL->drawPaint(paint);
+ }
++void SkLiteRecorder::onDrawBehind(const SkPaint& paint) {
++    fDL->drawBehind(paint);
++}
+ void SkLiteRecorder::onDrawPath(const SkPath& path, const SkPaint& paint) {
+     fDL->drawPath(path, paint);
+ }
+diff --git a/src/core/SkLiteRecorder.h b/src/core/SkLiteRecorder.h
+index 92b425b528..69cc39d005 100644
+--- a/src/core/SkLiteRecorder.h
++++ b/src/core/SkLiteRecorder.h
+@@ -25,6 +25,7 @@ public:
+ 
+     void willSave() override;
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec&) override;
++    bool onDoSaveBehind(const SkRect*) override;
+     void willRestore() override;
+ 
+     void onFlush() override;
+@@ -39,6 +40,7 @@ public:
+     void onClipRegion(const SkRegion&, SkClipOp) override;
+ 
+     void onDrawPaint (const SkPaint&) override;
++    void onDrawBehind(const SkPaint&) override;
+     void onDrawPath  (const SkPath&, const SkPaint&) override;
+     void onDrawRect  (const SkRect&, const SkPaint&) override;
+     void onDrawRegion(const SkRegion&, const SkPaint&) override;
+diff --git a/src/core/SkOverdrawCanvas.cpp b/src/core/SkOverdrawCanvas.cpp
+index acc5082754..b5a97e93ba 100644
+--- a/src/core/SkOverdrawCanvas.cpp
++++ b/src/core/SkOverdrawCanvas.cpp
+@@ -182,6 +182,10 @@ void SkOverdrawCanvas::onDrawPaint(const SkPaint& paint) {
+     }
+ }
+ 
++void SkOverdrawCanvas::onDrawBehind(const SkPaint& paint) {
++    fList[0]->onDrawBehind(this->overdrawPaint(paint));
++}
++
+ void SkOverdrawCanvas::onDrawRect(const SkRect& rect, const SkPaint& paint) {
+     fList[0]->onDrawRect(rect, this->overdrawPaint(paint));
+ }
+diff --git a/src/core/SkPictureFlat.h b/src/core/SkPictureFlat.h
+index ed9d0684fd..448e9d5537 100644
+--- a/src/core/SkPictureFlat.h
++++ b/src/core/SkPictureFlat.h
+@@ -96,8 +96,10 @@ enum DrawType {
+     DRAW_VERTICES_OBJECT,
+ 
+     FLUSH,
++    SAVE_BEHIND,
++    DRAW_BEHIND_PAINT,
+ 
+-    LAST_DRAWTYPE_ENUM = FLUSH
++    LAST_DRAWTYPE_ENUM = DRAW_BEHIND_PAINT,
+ };
+ 
+ // In the 'match' method, this constant will match any flavor of DRAW_BITMAP*
+@@ -128,6 +130,10 @@ enum SaveLayerRecFlatFlags {
+     SAVELAYERREC_HAS_CLIPMATRIX = 1 << 5,
+ };
+ 
++enum SaveBehindFlatFlags {
++    SAVEBEHIND_HAS_SUBSET = 1 << 0,
++};
++
+ ///////////////////////////////////////////////////////////////////////////////
+ // clipparams are packed in 5 bits
+ //  doAA:1 | clipOp:4
+diff --git a/src/core/SkPicturePlayback.cpp b/src/core/SkPicturePlayback.cpp
+index 7b9e411764..e2159bead9 100644
+--- a/src/core/SkPicturePlayback.cpp
++++ b/src/core/SkPicturePlayback.cpp
+@@ -419,6 +419,14 @@ void SkPicturePlayback::handleOp(SkReadBuffer* reader,
+                 canvas->drawPaint(*paint);
+             }
+         } break;
++        case DRAW_BEHIND_PAINT: {
++            const SkPaint* paint = fPictureData->getPaint(reader);
++            BREAK_ON_READ_ERROR(reader);
++
++            if (paint) {
++                SkCanvasPriv::DrawBehind(canvas, *paint);
++            }
++        } break;
+         case DRAW_PATCH: {
+             const SkPaint* paint = fPictureData->getPaint(reader);
+ 
+@@ -685,6 +693,16 @@ void SkPicturePlayback::handleOp(SkReadBuffer* reader,
+         case SAVE:
+             canvas->save();
+             break;
++        case SAVE_BEHIND: {
++            uint32_t flags = reader->readInt();
++            const SkRect* subset = nullptr;
++            SkRect storage;
++            if (flags & SAVEBEHIND_HAS_SUBSET) {
++                reader->readRect(&storage);
++                subset = &storage;
++            }
++            SkCanvasPriv::SaveBehind(canvas, subset);
++        } break;
+         case SAVE_LAYER_SAVEFLAGS_DEPRECATED: {
+             SkRect storage;
+             const SkRect* boundsPtr = get_rect_ptr(reader, &storage);
+diff --git a/src/core/SkPictureRecord.cpp b/src/core/SkPictureRecord.cpp
+index 6268584aa0..c62c4077cd 100644
+--- a/src/core/SkPictureRecord.cpp
++++ b/src/core/SkPictureRecord.cpp
+@@ -82,6 +82,26 @@ SkCanvas::SaveLayerStrategy SkPictureRecord::getSaveLayerStrategy(const SaveLaye
+     return kNoLayer_SaveLayerStrategy;
+ }
+ 
++bool SkPictureRecord::onDoSaveBehind(const SkRect* subset) {
++    fRestoreOffsetStack.push(-(int32_t)fWriter.bytesWritten());
++
++    size_t size = sizeof(kUInt32Size) + sizeof(uint32_t); // op + flags
++    uint32_t flags = 0;
++    if (subset) {
++        flags |= SAVEBEHIND_HAS_SUBSET;
++        size += sizeof(*subset);
++    }
++
++    size_t initialOffset = this->addDraw(SAVE_BEHIND, &size);
++    this->addInt(flags);
++    if (subset) {
++        this->addRect(*subset);
++    }
++
++    this->validate(initialOffset, size);
++    return false;
++}
++
+ void SkPictureRecord::recordSaveLayer(const SaveLayerRec& rec) {
+     // op + flatflags
+     size_t size = 2 * kUInt32Size;
+@@ -409,6 +429,15 @@ void SkPictureRecord::onDrawPaint(const SkPaint& paint) {
+     this->validate(initialOffset, size);
+ }
+ 
++void SkPictureRecord::onDrawBehind(const SkPaint& paint) {
++    // logically the same as drawPaint, but with a diff enum
++    // op + paint index
++    size_t size = 2 * kUInt32Size;
++    size_t initialOffset = this->addDraw(DRAW_BEHIND_PAINT, &size);
++    this->addPaint(paint);
++    this->validate(initialOffset, size);
++}
++
+ void SkPictureRecord::onDrawPoints(PointMode mode, size_t count, const SkPoint pts[],
+                                    const SkPaint& paint) {
+     // op + paint index + mode + count + point data
+diff --git a/src/core/SkPictureRecord.h b/src/core/SkPictureRecord.h
+index f67573d717..a0be31dce9 100644
+--- a/src/core/SkPictureRecord.h
++++ b/src/core/SkPictureRecord.h
+@@ -156,6 +156,7 @@ protected:
+ 
+     void willSave() override;
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec&) override;
++    bool onDoSaveBehind(const SkRect*) override;
+     void willRestore() override;
+ 
+     void didConcat(const SkMatrix&) override;
+@@ -180,6 +181,7 @@ protected:
+                      SkBlendMode, const SkRect*, const SkPaint*) override;
+ 
+     void onDrawPaint(const SkPaint&) override;
++    void onDrawBehind(const SkPaint&) override;
+     void onDrawPoints(PointMode, size_t count, const SkPoint pts[], const SkPaint&) override;
+     void onDrawRect(const SkRect&, const SkPaint&) override;
+     void onDrawRegion(const SkRegion&, const SkPaint&) override;
+diff --git a/src/core/SkRecordDraw.cpp b/src/core/SkRecordDraw.cpp
+index 89eb8a751a..2d819e6799 100644
+--- a/src/core/SkRecordDraw.cpp
++++ b/src/core/SkRecordDraw.cpp
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include "SkRecordDraw.h"
++#include "SkCanvasPriv.h"
+ #include "SkImage.h"
+ #include "SkPatchUtils.h"
+ 
+@@ -82,6 +83,15 @@ DRAW(SaveLayer, saveLayer(SkCanvas::SaveLayerRec(r.bounds,
+                                                  r.clipMask.get(),
+                                                  r.clipMatrix,
+                                                  r.saveLayerFlags)));
++
++template <> void Draw::draw(const SaveBehind& r) {
++    SkCanvasPriv::SaveBehind(fCanvas, r.subset);
++}
++
++template <> void Draw::draw(const DrawBehind& r) {
++    SkCanvasPriv::DrawBehind(fCanvas, r.paint);
++}
++
+ DRAW(SetMatrix, setMatrix(SkMatrix::Concat(fInitialCTM, r.matrix)));
+ DRAW(Concat, concat(r.matrix));
+ DRAW(Translate, translate(r.dx, r.dy));
+@@ -290,6 +300,7 @@ private:
+     // from the bounds of the ops in the same Save block.
+     void trackBounds(const Save&)          { this->pushSaveBlock(nullptr); }
+     void trackBounds(const SaveLayer& op)  { this->pushSaveBlock(op.paint); }
++    void trackBounds(const SaveBehind&)    { this->pushSaveBlock(nullptr); }
+     void trackBounds(const Restore&) { fBounds[fCurrentOp] = this->popSaveBlock(); }
+ 
+     void trackBounds(const SetMatrix&)         { this->pushControl(); }
+@@ -396,6 +407,7 @@ private:
+     Bounds bounds(const DrawText&) const { return fCurrentClipBounds; }
+ 
+     Bounds bounds(const DrawPaint&) const { return fCurrentClipBounds; }
++    Bounds bounds(const DrawBehind&) const { return fCurrentClipBounds; }
+     Bounds bounds(const NoOp&)  const { return Bounds::MakeEmpty(); }    // NoOps don't draw.
+ 
+     Bounds bounds(const DrawRect& op) const { return this->adjustAndMap(op.rect, &op.paint); }
+diff --git a/src/core/SkRecorder.cpp b/src/core/SkRecorder.cpp
+index 9374b60264..ce18c00776 100644
+--- a/src/core/SkRecorder.cpp
++++ b/src/core/SkRecorder.cpp
+@@ -133,6 +133,10 @@ void SkRecorder::onDrawPaint(const SkPaint& paint) {
+     APPEND(DrawPaint, paint);
+ }
+ 
++void SkRecorder::onDrawBehind(const SkPaint& paint) {
++    APPEND(DrawBehind, paint);
++}
++
+ void SkRecorder::onDrawPoints(PointMode mode,
+                               size_t count,
+                               const SkPoint pts[],
+@@ -365,6 +369,11 @@ SkCanvas::SaveLayerStrategy SkRecorder::getSaveLayerStrategy(const SaveLayerRec&
+     return SkCanvas::kNoLayer_SaveLayerStrategy;
+ }
+ 
++bool SkRecorder::onDoSaveBehind(const SkRect* subset) {
++    APPEND(SaveBehind, this->copy(subset));
++    return false;
++}
++
+ void SkRecorder::didRestore() {
+     APPEND(Restore, this->getDeviceClipBounds(), this->getTotalMatrix());
+ }
+diff --git a/src/core/SkRecorder.h b/src/core/SkRecorder.h
+index 382048f382..27e3074708 100644
+--- a/src/core/SkRecorder.h
++++ b/src/core/SkRecorder.h
+@@ -57,6 +57,7 @@ public:
+ 
+     void willSave() override;
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec&) override;
++    bool onDoSaveBehind(const SkRect*) override;
+     void willRestore() override {}
+     void didRestore() override;
+ 
+@@ -99,6 +100,7 @@ public:
+                      const SkPaint& paint) override;
+ 
+     void onDrawPaint(const SkPaint&) override;
++    void onDrawBehind(const SkPaint&) override;
+     void onDrawPoints(PointMode, size_t count, const SkPoint pts[], const SkPaint&) override;
+     void onDrawRect(const SkRect&, const SkPaint&) override;
+     void onDrawRegion(const SkRegion&, const SkPaint&) override;
+diff --git a/src/core/SkRecords.h b/src/core/SkRecords.h
+index f1e70b6c88..3c060d38ac 100644
+--- a/src/core/SkRecords.h
++++ b/src/core/SkRecords.h
+@@ -51,6 +51,7 @@ namespace SkRecords {
+     M(Restore)                                                      \
+     M(Save)                                                         \
+     M(SaveLayer)                                                    \
++    M(SaveBehind)                                                   \
+     M(SetMatrix)                                                    \
+     M(Translate)                                                    \
+     M(Concat)                                                       \
+@@ -66,6 +67,7 @@ namespace SkRecords {
+     M(DrawImageNine)                                                \
+     M(DrawDRRect)                                                   \
+     M(DrawOval)                                                     \
++    M(DrawBehind)                                                   \
+     M(DrawPaint)                                                    \
+     M(DrawPath)                                                     \
+     M(DrawPatch)                                                    \
+@@ -189,6 +191,9 @@ RECORD(SaveLayer, kHasPaint_Tag,
+        Optional<SkMatrix> clipMatrix;
+        SkCanvas::SaveLayerFlags saveLayerFlags);
+ 
++RECORD(SaveBehind, 0,
++       Optional<SkRect> subset);
++
+ RECORD(SetMatrix, 0,
+         TypedMatrix matrix);
+ RECORD(Concat, 0,
+@@ -276,6 +281,8 @@ RECORD(DrawOval, kDraw_Tag|kHasPaint_Tag,
+         SkRect oval);
+ RECORD(DrawPaint, kDraw_Tag|kHasPaint_Tag,
+         SkPaint paint);
++RECORD(DrawBehind, kDraw_Tag|kHasPaint_Tag,
++       SkPaint paint);
+ RECORD(DrawPath, kDraw_Tag|kHasPaint_Tag,
+         SkPaint paint;
+         PreCachedPath path);
+diff --git a/src/core/SkSpecialImage.cpp b/src/core/SkSpecialImage.cpp
+index 61acd3fc69..679c09464f 100644
+--- a/src/core/SkSpecialImage.cpp
++++ b/src/core/SkSpecialImage.cpp
+@@ -337,6 +337,25 @@ sk_sp<SkSpecialImage> SkSpecialImage::MakeFromRaster(const SkIRect& subset,
+     return sk_make_sp<SkSpecialImage_Raster>(subset, *srcBM, props);
+ }
+ 
++sk_sp<SkSpecialImage> SkSpecialImage::CopyFromRaster(const SkIRect& subset,
++                                                     const SkBitmap& bm,
++                                                     const SkSurfaceProps* props) {
++    SkASSERT(rect_fits(subset, bm.width(), bm.height()));
++
++    if (!bm.pixelRef()) {
++        return nullptr;
++    }
++
++    SkBitmap tmp;
++    if (!tmp.tryAllocPixels(bm.info().makeWH(subset.width(), subset.height()))) {
++        return nullptr;
++    }
++    if (!bm.readPixels(tmp.info(), tmp.getPixels(), tmp.rowBytes(), subset.x(), subset.y())) {
++        return nullptr;
++    }
++    return sk_make_sp<SkSpecialImage_Raster>(subset, tmp, props);
++}
++
+ #if SK_SUPPORT_GPU
+ ///////////////////////////////////////////////////////////////////////////////
+ static sk_sp<SkImage> wrap_proxy_in_image(GrContext* context, sk_sp<GrTextureProxy> proxy,
+diff --git a/src/core/SkSpecialImage.h b/src/core/SkSpecialImage.h
+index d694fa22e2..1861bdb4cf 100644
+--- a/src/core/SkSpecialImage.h
++++ b/src/core/SkSpecialImage.h
+@@ -76,6 +76,9 @@ public:
+     static sk_sp<SkSpecialImage> MakeFromRaster(const SkIRect& subset,
+                                                 const SkBitmap&,
+                                                 const SkSurfaceProps* = nullptr);
++    static sk_sp<SkSpecialImage> CopyFromRaster(const SkIRect& subset,
++                                                const SkBitmap&,
++                                                const SkSurfaceProps* = nullptr);
+ #if SK_SUPPORT_GPU
+     static sk_sp<SkSpecialImage> MakeDeferredFromGpu(GrContext*,
+                                                      const SkIRect& subset,
+diff --git a/src/gpu/SkGpuDevice.cpp b/src/gpu/SkGpuDevice.cpp
+index 9b5a5a9338..0cf4a9a08b 100644
+--- a/src/gpu/SkGpuDevice.cpp
++++ b/src/gpu/SkGpuDevice.cpp
+@@ -1264,6 +1264,32 @@ sk_sp<SkSpecialImage> SkGpuDevice::snapSpecial() {
+                                                &this->surfaceProps());
+ }
+ 
++sk_sp<SkSpecialImage> SkGpuDevice::snapBackImage(const SkIRect& subset) {
++    GrRenderTargetContext* rtc = this->accessRenderTargetContext();
++    if (!rtc) {
++        return nullptr;
++    }
++
++    GrContext* ctx = this->context();
++    if (!rtc->asSurfaceProxy()) {
++        return nullptr;
++    }
++
++    auto srcProxy = GrSurfaceProxy::Copy(ctx, rtc->asSurfaceProxy(), rtc->mipMapped(), subset,
++                                         rtc->asSurfaceProxy()->isBudgeted());
++    if (!srcProxy) {
++        return nullptr;
++    }
++
++    // Note, can't move srcProxy since we also refer to this in the 2nd parameter
++    return SkSpecialImage::MakeDeferredFromGpu(fContext.get(),
++                                               SkIRect::MakeWH(srcProxy->width(), srcProxy->height()),
++                                               kNeedNewImageUniqueID_SpecialImage,
++                                               srcProxy,
++                                               this->imageInfo().refColorSpace(),
++                                               &this->surfaceProps());
++}
++
+ void SkGpuDevice::drawDevice(SkBaseDevice* device,
+                              int left, int top, const SkPaint& paint) {
+     SkASSERT(!paint.getImageFilter());
+diff --git a/src/gpu/SkGpuDevice.h b/src/gpu/SkGpuDevice.h
+index 6a3f22d6e7..9a1ac12e6c 100644
+--- a/src/gpu/SkGpuDevice.h
++++ b/src/gpu/SkGpuDevice.h
+@@ -117,6 +117,7 @@ public:
+     sk_sp<SkSpecialImage> makeSpecial(const SkBitmap&) override;
+     sk_sp<SkSpecialImage> makeSpecial(const SkImage*) override;
+     sk_sp<SkSpecialImage> snapSpecial() override;
++    sk_sp<SkSpecialImage> snapBackImage(const SkIRect&) override;
+ 
+     void flush() override;
+     GrSemaphoresSubmitted flushAndSignalSemaphores(int numSemaphores,
+diff --git a/src/utils/SkLuaCanvas.cpp b/src/utils/SkLuaCanvas.cpp
+index 53e462af0d..aa8aba254c 100644
+--- a/src/utils/SkLuaCanvas.cpp
++++ b/src/utils/SkLuaCanvas.cpp
+@@ -100,6 +100,11 @@ SkCanvas::SaveLayerStrategy SkLuaCanvas::getSaveLayerStrategy(const SaveLayerRec
+     return kNoLayer_SaveLayerStrategy;
+ }
+ 
++bool SkLuaCanvas::onDoSaveBehind(const SkRect*) {
++    // TODO
++    return false;
++}
++
+ void SkLuaCanvas::willRestore() {
+     AUTO_LUA("restore");
+     this->INHERITED::willRestore();
+diff --git a/src/utils/SkNWayCanvas.cpp b/src/utils/SkNWayCanvas.cpp
+index c612c7d7e1..687413d765 100644
+--- a/src/utils/SkNWayCanvas.cpp
++++ b/src/utils/SkNWayCanvas.cpp
+@@ -4,7 +4,9 @@
+  * Use of this source code is governed by a BSD-style license that can be
+  * found in the LICENSE file.
+  */
++
+ #include "SkNWayCanvas.h"
++#include "SkCanvasPriv.h"
+ 
+ SkNWayCanvas::SkNWayCanvas(int width, int height) : INHERITED(width, height) {}
+ 
+@@ -45,6 +47,7 @@ public:
+         return false;
+     }
+     SkCanvas* operator->() { return fCanvas; }
++    SkCanvas* get() const { return fCanvas; }
+ 
+ private:
+     const SkTDArray<SkCanvas*>& fList;
+@@ -72,6 +75,15 @@ SkCanvas::SaveLayerStrategy SkNWayCanvas::getSaveLayerStrategy(const SaveLayerRe
+     return kNoLayer_SaveLayerStrategy;
+ }
+ 
++bool SkNWayCanvas::onDoSaveBehind(const SkRect* bounds) {
++    Iter iter(fList);
++    while (iter.next()) {
++        SkCanvasPriv::SaveBehind(iter.get(), bounds);
++    }
++    this->INHERITED::onDoSaveBehind(bounds);
++    return false;
++}
++
+ void SkNWayCanvas::willRestore() {
+     Iter iter(fList);
+     while (iter.next()) {
+@@ -135,6 +147,13 @@ void SkNWayCanvas::onDrawPaint(const SkPaint& paint) {
+     }
+ }
+ 
++void SkNWayCanvas::onDrawBehind(const SkPaint& paint) {
++    Iter iter(fList);
++    while (iter.next()) {
++        SkCanvasPriv::DrawBehind(iter.get(), paint);
++    }
++}
++
+ void SkNWayCanvas::onDrawPoints(PointMode mode, size_t count, const SkPoint pts[],
+                                 const SkPaint& paint) {
+     Iter iter(fList);
+diff --git a/src/utils/SkPaintFilterCanvas.cpp b/src/utils/SkPaintFilterCanvas.cpp
+index 668ebe37a9..7ea95b7845 100644
+--- a/src/utils/SkPaintFilterCanvas.cpp
++++ b/src/utils/SkPaintFilterCanvas.cpp
+@@ -48,6 +48,13 @@ void SkPaintFilterCanvas::onDrawPaint(const SkPaint& paint) {
+     }
+ }
+ 
++void SkPaintFilterCanvas::onDrawBehind(const SkPaint& paint) {
++    AutoPaintFilter apf(this, kPaint_Type, paint);
++    if (apf.shouldDraw()) {
++        this->SkNWayCanvas::onDrawBehind(*apf.paint());
++    }
++}
++
+ void SkPaintFilterCanvas::onDrawPoints(PointMode mode, size_t count, const SkPoint pts[],
+                                        const SkPaint& paint) {
+     AutoPaintFilter apf(this, kPoint_Type, paint);
+diff --git a/tests/PictureTest.cpp b/tests/PictureTest.cpp
+index 425b25a153..4f76c6a829 100644
+--- a/tests/PictureTest.cpp
++++ b/tests/PictureTest.cpp
+@@ -102,6 +102,7 @@ public:
+         : INHERITED(width, height)
+         , fSaveCount(0)
+         , fSaveLayerCount(0)
++        , fSaveBehindCount(0)
+         , fRestoreCount(0){
+     }
+ 
+@@ -110,6 +111,11 @@ public:
+         return this->INHERITED::getSaveLayerStrategy(rec);
+     }
+ 
++    bool onDoSaveBehind(const SkRect* subset) override {
++        ++fSaveBehindCount;
++        return this->INHERITED::onDoSaveBehind(subset);
++    }
++
+     void willSave() override {
+         ++fSaveCount;
+         this->INHERITED::willSave();
+@@ -122,11 +128,13 @@ public:
+ 
+     unsigned int getSaveCount() const { return fSaveCount; }
+     unsigned int getSaveLayerCount() const { return fSaveLayerCount; }
++    unsigned int getSaveBehindCount() const { return fSaveBehindCount; }
+     unsigned int getRestoreCount() const { return fRestoreCount; }
+ 
+ private:
+     unsigned int fSaveCount;
+     unsigned int fSaveLayerCount;
++    unsigned int fSaveBehindCount;
+     unsigned int fRestoreCount;
+ 
+     typedef SkCanvas INHERITED;
+diff --git a/tools/debugger/SkDebugCanvas.cpp b/tools/debugger/SkDebugCanvas.cpp
+index 0bfd85f7f9..7557faa0c8 100644
+--- a/tools/debugger/SkDebugCanvas.cpp
++++ b/tools/debugger/SkDebugCanvas.cpp
+@@ -616,6 +616,11 @@ SkCanvas::SaveLayerStrategy SkDebugCanvas::getSaveLayerStrategy(const SaveLayerR
+     return kNoLayer_SaveLayerStrategy;
+ }
+ 
++bool SkDebugCanvas::onDoSaveBehind(const SkRect* subset) {
++    // TODO
++    return false;
++}
++
+ void SkDebugCanvas::didSetMatrix(const SkMatrix& matrix) {
+     this->addDrawCommand(new SkSetMatrixCommand(matrix));
+     this->INHERITED::didSetMatrix(matrix);
+diff --git a/tools/debugger/SkDebugCanvas.h b/tools/debugger/SkDebugCanvas.h
+index 634d5b416d..864215c76d 100644
+--- a/tools/debugger/SkDebugCanvas.h
++++ b/tools/debugger/SkDebugCanvas.h
+@@ -171,9 +171,8 @@ public:
+ 
+ protected:
+     void willSave() override;
+-
+     SaveLayerStrategy getSaveLayerStrategy(const SaveLayerRec &) override;
+-
++    bool onDoSaveBehind(const SkRect*) override;
+     void willRestore() override;
+ 
+     void didConcat(const SkMatrix &) override;
+-- 
+2.22.0
+
